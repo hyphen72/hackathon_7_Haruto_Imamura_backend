@@ -158,4 +158,4 @@ func closeDBWithSysCall() {
 		os.Exit(0)
 	}()
 }
-// git push用メモ
+// git push用　メモメモ
