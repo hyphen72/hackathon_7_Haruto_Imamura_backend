@@ -82,8 +82,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		w.Write(bytes)
 	case http.MethodPost:
 		var reqBody struct {
-			Name string `json:"name"`
-			Age  int    `json:"age"`
+			FirebaseUid string `json:firebaseUid`
+			Email  string    `json:"email"`
+			Username string `json:"username"`
 		}
 		err := json.NewDecoder(r.Body).Decode(&reqBody)
 		if err != nil {
@@ -91,18 +92,16 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("fail: decode to json, %v\n", err)
 			return
 		}
-		name := reqBody.Name
-		age := reqBody.Age
+		username := reqBody.Username
+		email := reqBody.Email
+		id := reqBody.FirebaseUid
 		tx, err := db.Begin()
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			log.Printf("fail: db begin, %v\n", err)
 			return
 		}
-		entropy := rand.Reader
-		id := ulid.MustNew(ulid.Timestamp(time.Now()), entropy)
-		idString := id.String()
-		stmt, err := db.Prepare("INSERT INTO user(id, name, age) VALUES(?, ?, ?)")
+		stmt, err := db.Prepare("INSERT INTO user(id, username, email) VALUES(?, ?, ?)")
 		if err != nil {
 			tx.Rollback()
 			log.Printf("insert into sql, %v\n", err)
@@ -110,7 +109,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer stmt.Close()
-		_, err = stmt.Exec(idString, name, age)
+		_, err = stmt.Exec(id, username, email)
 		if err != nil {
 			tx.Rollback()
 			log.Printf("fail:stmt, %v\n", err)
