@@ -107,7 +107,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
         return
     	}
 		id := token.UID
-		email := token.Firebase.Email
+		email := "" 
+		if emailClaim, ok := token.Claims["email"]; ok {
+    		if emailStr, isString := emailClaim.(string); isString {
+        		email = emailStr
+    		}
+		}
 		var reqBody struct {
 			Username string `json:"username"`
 		}
