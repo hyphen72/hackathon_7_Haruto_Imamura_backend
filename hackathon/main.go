@@ -11,6 +11,12 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"context"
+    "log"
+    "strings" // Authorization ヘッダー処理用
+    firebase "firebase.google.com/go"
+    "firebase.google.com/go/auth" // authパッケージをインポート
+    "google.golang.org/api/option"
 )
 
 type UserResForHTTPGet struct {
@@ -20,8 +26,18 @@ type UserResForHTTPGet struct {
 }
 
 var db *sql.DB
-
+var firebaseApp *firebase.App
 func init() {
+	secretkey := os.Getenv("FIERBASE_SECRET_KEY")
+	opt := option.WithCredentialsJSON([]byte(serviceAccountKeyJSON))
+    app, err := firebase.NewApp(context.Background(), nil, opt)
+    if err != nil {
+        log.Fatalf("Firebase app initialization error: %v\n", err)
+    }
+    firebaseApp = app
+    log.Println("Firebase Admin SDK initialized successfully.")
+
+
 	err := godotenv.Load()
 		if err != nil {
 		log.Printf("fail: env.load, %v\n", err)
@@ -78,8 +94,23 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(bytes)
 	case http.MethodPost:
+		idToken := strings.TrimPrefix(authHeader, "Bearer ")
+		authHeader := r.Header.Get("Authorization")
+		ctx := r.Context() // リクエストのコンテキストを使用
+    	client, err := firebaseApp.Auth(ctx)
+    	if err != nil {
+        	w.WriteHeader(http.StatusInternalServerError)
+        	log.Printf("fail: get firebase auth client, %v\n", err)
+        	return
+    	}
+		token, err := client.VerifyIDToken(ctx, idToken)
+    	if err != nil {
+        w.WriteHeader(http.StatusUnauthorized)
+        log.Printf("fail: verify ID token, %v\n", err)
+        return
+    	}
+		id := token.UID
 		var reqBody struct {
-			FirebaseUid string `json:firebaseUid`
 			Email  string    `json:"email"`
 			Username string `json:"username"`
 		}
@@ -91,13 +122,21 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		}
 		username := reqBody.Username
 		email := reqBody.Email
-		id := reqBody.FirebaseUid
 		tx, err := db.Begin()
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			log.Printf("fail: db begin, %v\n", err)
 			return
 		}
+		ctx := r.Context()
+        client, err := firebaseApp.Auth(ctx)
+		token, err := client.VerifyIDToken(ctx, id)
+        if err != nil {
+            // トークンの検証失敗 (トークンが無効、期限切れ、偽造など)
+            w.WriteHeader(http.StatusUnauthorized) // 401 Unauthorized
+            log.Printf("fail: verify ID token, %v\n", err)
+            return
+        }
 		stmt, err := db.Prepare("INSERT INTO user(id, username, email) VALUES(?, ?, ?)")
 		if err != nil {
 			tx.Rollback()
