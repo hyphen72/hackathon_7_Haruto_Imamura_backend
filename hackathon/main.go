@@ -27,6 +27,10 @@ type UserResForHTTPGet struct {
 var db *sql.DB
 var firebaseApp *firebase.App
 func init() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Printf("fail: env.load, %v\n", err)
+	}
 	secretkey := os.Getenv("FIERBASE_SECRET_KEY")
 	opt := option.WithCredentialsJSON([]byte(secretkey))
     app, err := firebase.NewApp(context.Background(), nil, opt)
@@ -35,12 +39,6 @@ func init() {
     }
     firebaseApp = app
     log.Println("Firebase Admin SDK initialized successfully.")
-
-
-	err = godotenv.Load()
-		if err != nil {
-		log.Printf("fail: env.load, %v\n", err)
-	}
     mysqlUser := os.Getenv("MYSQL_USER")
     mysqlPwd := os.Getenv("MYSQL_PWD")
     mysqlHost := os.Getenv("MYSQL_HOST")
@@ -95,7 +93,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		authHeader := r.Header.Get("Authorization")
 		idToken := strings.TrimPrefix(authHeader, "Bearer ")
-		ctx := r.Context() // リクエストのコンテキストを使用
+		ctx := r.Context() 
     	client, err := firebaseApp.Auth(ctx)
     	if err != nil {
         	w.WriteHeader(http.StatusInternalServerError)
@@ -109,8 +107,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
         return
     	}
 		id := token.UID
+		email := token.Firebase.Email
 		var reqBody struct {
-			Email  string    `json:"email"`
 			Username string `json:"username"`
 		}
 		err = json.NewDecoder(r.Body).Decode(&reqBody)
@@ -120,7 +118,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		username := reqBody.Username
-		email := reqBody.Email
 		tx, err := db.Begin()
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -142,7 +139,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		if err := tx.Commit(); err != nil {
+		if err = tx.Commit(); err != nil {
 			tx.Rollback()
 			log.Printf("fail: commit, %v\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
