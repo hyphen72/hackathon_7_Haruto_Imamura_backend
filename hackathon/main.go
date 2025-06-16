@@ -6,7 +6,6 @@ import (
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/joho/godotenv"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -29,7 +28,7 @@ var db *sql.DB
 var firebaseApp *firebase.App
 func init() {
 	secretkey := os.Getenv("FIERBASE_SECRET_KEY")
-	opt := option.WithCredentialsJSON([]byte(serviceAccountKeyJSON))
+	opt := option.WithCredentialsJSON([]byte(secretkey))
     app, err := firebase.NewApp(context.Background(), nil, opt)
     if err != nil {
         log.Fatalf("Firebase app initialization error: %v\n", err)
@@ -38,7 +37,7 @@ func init() {
     log.Println("Firebase Admin SDK initialized successfully.")
 
 
-	err := godotenv.Load()
+	err = godotenv.Load()
 		if err != nil {
 		log.Printf("fail: env.load, %v\n", err)
 	}
@@ -94,8 +93,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(bytes)
 	case http.MethodPost:
-		idToken := strings.TrimPrefix(authHeader, "Bearer ")
 		authHeader := r.Header.Get("Authorization")
+		idToken := strings.TrimPrefix(authHeader, "Bearer ")
 		ctx := r.Context() // リクエストのコンテキストを使用
     	client, err := firebaseApp.Auth(ctx)
     	if err != nil {
@@ -114,7 +113,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			Email  string    `json:"email"`
 			Username string `json:"username"`
 		}
-		err := json.NewDecoder(r.Body).Decode(&reqBody)
+		err = json.NewDecoder(r.Body).Decode(&reqBody)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			log.Printf("fail: decode to json, %v\n", err)
@@ -128,15 +127,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("fail: db begin, %v\n", err)
 			return
 		}
-		ctx := r.Context()
-        client, err := firebaseApp.Auth(ctx)
-		token, err := client.VerifyIDToken(ctx, id)
-        if err != nil {
-            // トークンの検証失敗 (トークンが無効、期限切れ、偽造など)
-            w.WriteHeader(http.StatusUnauthorized) // 401 Unauthorized
-            log.Printf("fail: verify ID token, %v\n", err)
-            return
-        }
 		stmt, err := db.Prepare("INSERT INTO user(id, username, email) VALUES(?, ?, ?)")
 		if err != nil {
 			tx.Rollback()
