@@ -12,9 +12,9 @@ import (
 	"syscall"
 	"context"
     "log"
-    "strings" // Authorization ヘッダー処理用
+    "strings" 
     firebase "firebase.google.com/go"
-    "firebase.google.com/go/auth" // authパッケージをインポート
+    "firebase.google.com/go/auth" 
     "google.golang.org/api/option"
 )
 
@@ -52,6 +52,8 @@ func init() {
 		log.Fatalf("fail: _db.Ping, %v\n", err)
 	}
 	log.Println("Successfully connected to the database")
+
+	_ = auth.Client{} //エラー回避用
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
