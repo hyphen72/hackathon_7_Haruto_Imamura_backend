@@ -131,7 +131,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("fail: db begin, %v\n", err)
 			return
 		}
-		stmt, err := db.Prepare("INSERT INTO user(id, username, email) VALUES(?, ?, ?)")
+		stmt, err := db.Prepare("INSERT INTO users(id, username, email) VALUES(?, ?, ?)")
 		if err != nil {
 			tx.Rollback()
 			log.Printf("insert into sql, %v\n", err)
