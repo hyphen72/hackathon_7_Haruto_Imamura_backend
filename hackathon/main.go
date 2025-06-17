@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/joho/godotenv"
 	"net/http"
 	"os"
 	"os/signal"
