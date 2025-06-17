@@ -26,7 +26,7 @@ type UserResForHTTPGet struct {
 var db *sql.DB
 var firebaseApp *firebase.App
 func init() {
-	secretkey := os.Getenv("FIERBASE_SECRET_KEY")
+	secretkey := os.Getenv("FIREBASE_SECRET_KEY")
 	opt := option.WithCredentialsJSON([]byte(secretkey))
 	log.Printf("FIERBASE_SECRET_KEY length: %d bytes\n", len(secretkey))
     if len(secretkey) > 50 { // キーが長すぎるので先頭と末尾だけ表示
@@ -39,7 +39,7 @@ func init() {
         log.Fatalf("Firebase app initialization error: %v\n", err)
     }
     firebaseApp = app
-    log.Println("Firebase Admin SDK initialized successfully.")
+    log.Printf("Firebase Admin SDK initialized with project ID from secret key JSON: %s\n", projectID)
     mysqlUser := os.Getenv("MYSQL_USER")
     mysqlPwd := os.Getenv("MYSQL_PWD")
     mysqlHost := os.Getenv("MYSQL_HOST")
