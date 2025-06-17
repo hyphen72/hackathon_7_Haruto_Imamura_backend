@@ -27,12 +27,14 @@ type UserResForHTTPGet struct {
 var db *sql.DB
 var firebaseApp *firebase.App
 func init() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Printf("fail: env.load, %v\n", err)
-	}
 	secretkey := os.Getenv("FIERBASE_SECRET_KEY")
 	opt := option.WithCredentialsJSON([]byte(secretkey))
+	log.Printf("FIERBASE_SECRET_KEY length: %d bytes\n", len(secretkey))
+    if len(secretkey) > 50 { // キーが長すぎるので先頭と末尾だけ表示
+        log.Printf("FIERBASE_SECRET_KEY start: %s..., end: ...%s\n", secretkey[:20], secretkey[len(secretkey)-20:])
+    } else {
+        log.Printf("FIERBASE_SECRET_KEY: %s\n", secretkey)
+    }
     app, err := firebase.NewApp(context.Background(), nil, opt)
     if err != nil {
         log.Fatalf("Firebase app initialization error: %v\n", err)
