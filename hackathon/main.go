@@ -65,7 +65,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	case http.MethodGet:
-		rows, err := db.Query("SELECT name, age FROM user")
+		rows, err := db.Query("SELECT name, age FROM users")
 		if err != nil {
 			log.Printf("fail: db.Query, %v\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
