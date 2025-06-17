@@ -39,11 +39,12 @@ func init() {
         log.Fatalf("Firebase app initialization error: %v\n", err)
     }
     firebaseApp = app
-    log.Printf("Firebase Admin SDK initialized with project ID from secret key JSON: %s\n", projectID)
+    log.Printf("Firebase Admin SDK initialized")
     mysqlUser := os.Getenv("MYSQL_USER")
     mysqlPwd := os.Getenv("MYSQL_PWD")
     mysqlHost := os.Getenv("MYSQL_HOST")
     mysqlDatabase := os.Getenv("MYSQL_DATABASE")
+	log.Printf("MYSQL_PWD:", mysqlPwd)
     connStr := fmt.Sprintf("%s:%s@%s/%s", mysqlUser, mysqlPwd, mysqlHost, mysqlDatabase)
     db, err = sql.Open("mysql", connStr)
 	if err != nil {
