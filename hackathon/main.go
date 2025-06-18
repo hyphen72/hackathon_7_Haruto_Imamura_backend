@@ -19,9 +19,10 @@ import (
 )
 
 type UserResForHTTPGet struct {
-	Id   string `json:"id"`
-	Name string `json:"name"`
-	Age  int    `json:"age"`
+	ID        string `json:"id"`         // JSONキーを "id" にする
+    UserID    string `json:"user_id"`    // JSONキーを "user_id" にする
+    Content   string `json:"content"`
+    CreatedAt time.Time `json:"created_at"` // JSONキーを "created_at" にする
 }
 
 var db *sql.DB
@@ -195,6 +196,35 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
+	case http.MethodGet:
+		rows, err := db.Query("SELECT id, user_id, content, created_at FROM posts ORDER BY created_at DESC")
+		if err != nil {
+			log.Printf("fail: db.Query, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+		posts := make([]UserResForHTTPGet, 0)
+		for rows.Next() {
+			var u UserResForHTTPGet
+			if err := rows.Scan(&u.id, &u.user_id, &u.content, &u.created_at); err != nil {
+				log.Printf("fail: rows.Scan, %v\n", err)
+				if err := rows.Close(); err != nil {
+					log.Printf("fail: rows.Close(), %v\n", err)
+				}
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			posts = append(posts, u)
+		}
+		bytes, err := json.Marshal(posts)
+		if err != nil {
+			log.Printf("fail: json.Marshal, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(bytes)
 	default:
 		log.Printf("fail: HTTP Method is %s\n", r.Method)
 		w.WriteHeader(http.StatusBadRequest)
