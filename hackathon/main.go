@@ -12,7 +12,8 @@ import (
 	"context"
     "log"
     "strings" 
-    firebase "firebase.google.com/go"
+	"github.com/google/uuid"
+    "firebase.google.com/go"
     "firebase.google.com/go/auth" 
     "google.golang.org/api/option"
 )
@@ -28,12 +29,6 @@ var firebaseApp *firebase.App
 func init() {
 	secretkey := os.Getenv("FIREBASE_SECRET_KEY")
 	opt := option.WithCredentialsJSON([]byte(secretkey))
-	log.Printf("FIERBASE_SECRET_KEY length: %d bytes\n", len(secretkey))
-    if len(secretkey) > 50 { // キーが長すぎるので先頭と末尾だけ表示
-        log.Printf("FIERBASE_SECRET_KEY start: %s..., end: ...%s\n", secretkey[:20], secretkey[len(secretkey)-20:])
-    } else {
-        log.Printf("FIERBASE_SECRET_KEY: %s\n", secretkey)
-    }
     app, err := firebase.NewApp(context.Background(), nil, opt)
     if err != nil {
         log.Fatalf("Firebase app initialization error: %v\n", err)
@@ -44,7 +39,6 @@ func init() {
     mysqlPwd := os.Getenv("MYSQL_PWD")
     mysqlHost := os.Getenv("MYSQL_HOST")
     mysqlDatabase := os.Getenv("MYSQL_DATABASE")
-	log.Printf("MYSQL_PWD:", mysqlPwd)
     connStr := fmt.Sprintf("%s:%s@%s/%s", mysqlUser, mysqlPwd, mysqlHost, mysqlDatabase)
     db, err = sql.Open("mysql", connStr)
 	if err != nil {
@@ -57,8 +51,11 @@ func init() {
 
 	_ = auth.Client{} //エラー回避用
 }
+func generateUUID() string {
+	return uuid.New().String() 
+}
 
-func handler(w http.ResponseWriter, r *http.Request) {
+func userhandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
@@ -66,34 +63,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodOptions:
 		w.WriteHeader(http.StatusOK)
 		return
-	case http.MethodGet:
-		rows, err := db.Query("SELECT name, age FROM users")
-		if err != nil {
-			log.Printf("fail: db.Query, %v\n", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		users := make([]UserResForHTTPGet, 0)
-		for rows.Next() {
-			var u UserResForHTTPGet
-			if err := rows.Scan(&u.Name, &u.Age); err != nil {
-				log.Printf("fail: rows.Scan, %v\n", err)
-				if err := rows.Close(); err != nil {
-					log.Printf("fail: rows.Close(), %v\n", err)
-				}
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			users = append(users, u)
-		}
-		bytes, err := json.Marshal(users)
-		if err != nil {
-			log.Printf("fail: json.Marshal, %v\n", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(bytes)
 	case http.MethodPost:
 		authHeader := r.Header.Get("Authorization")
 		idToken := strings.TrimPrefix(authHeader, "Bearer ")
@@ -162,8 +131,80 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func posthandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	switch r.Method {
+	case http.MethodOptions:
+		w.WriteHeader(http.StatusOK)
+		return
+	case http.MethodPost:
+		authHeader := r.Header.Get("Authorization")
+		idToken := strings.TrimPrefix(authHeader, "Bearer ")
+		ctx := r.Context() 
+    	client, err := firebaseApp.Auth(ctx)
+    	if err != nil {
+        	w.WriteHeader(http.StatusInternalServerError)
+        	log.Printf("fail: get firebase auth client, %v\n", err)
+        	return
+    	}
+		token, err := client.VerifyIDToken(ctx, idToken)
+    	if err != nil {
+        w.WriteHeader(http.StatusUnauthorized)
+        log.Printf("fail: verify ID token, %v\n", err)
+        return
+    	}
+		id := token.UID
+		var reqBody struct {
+			Content string `json:"content"`
+		}
+		err = json.NewDecoder(r.Body).Decode(&reqBody)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			log.Printf("fail: decode to json, %v\n", err)
+			return
+		}
+		content := reqBody.Content
+		newPostID := generateUUID()
+		tx, err := db.Begin()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			log.Printf("fail: db begin, %v\n", err)
+			return
+		}
+		stmt, err := db.Prepare("INSERT INTO posts(id, user_id, content_text) VALUES(?, ?, ?)")
+		if err != nil {
+			tx.Rollback()
+			log.Printf("insert into sql, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		defer stmt.Close()
+		_, err = stmt.Exec(newPostID,id,content)
+		if err != nil {
+			tx.Rollback()
+			log.Printf("fail:stmt, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if err = tx.Commit(); err != nil {
+			tx.Rollback()
+			log.Printf("fail: commit, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	default:
+		log.Printf("fail: HTTP Method is %s\n", r.Method)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+}
+
 func main() {
-	http.HandleFunc("/user", handler)
+	http.HandleFunc("/user", userhandler)
+	http.HandleFunc("/post", posthandler)
 
 	// ③ Ctrl+CでHTTPサーバー停止時にDBをクローズする
 	closeDBWithSysCall()
