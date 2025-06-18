@@ -198,7 +198,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusOK)
 	case http.MethodGet:
-		rows, err := db.Query("SELECT id, user_id, content, created_at FROM posts ORDER BY created_at DESC")
+		rows, err := db.Query("SELECT id, user_id, content_text, created_at FROM posts ORDER BY created_at DESC")
 		if err != nil {
 			log.Printf("fail: db.Query, %v\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
