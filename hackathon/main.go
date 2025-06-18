@@ -207,7 +207,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 		posts := make([]UserResForHTTPGet, 0)
 		for rows.Next() {
 			var u UserResForHTTPGet
-			if err := rows.Scan(&u.id, &u.user_id, &u.content, &u.created_at); err != nil {
+			if err := rows.Scan(&u.ID, &UserID, &u.Content, &u.CreatedAt); err != nil {
 				log.Printf("fail: rows.Scan, %v\n", err)
 				if err := rows.Close(); err != nil {
 					log.Printf("fail: rows.Close(), %v\n", err)
