@@ -41,7 +41,7 @@ func init() {
     mysqlPwd := os.Getenv("MYSQL_PWD")
     mysqlHost := os.Getenv("MYSQL_HOST")
     mysqlDatabase := os.Getenv("MYSQL_DATABASE")
-    connStr := fmt.Sprintf("%s:%s@%s/%s", mysqlUser, mysqlPwd, mysqlHost, mysqlDatabase)
+    connStr := fmt.Sprintf("%s:%s@%s/%s?parseTime=True", mysqlUser, mysqlPwd, mysqlHost, mysqlDatabase)
     db, err = sql.Open("mysql", connStr)
 	if err != nil {
 		log.Fatalf("fail: sql.Open, %v\n", err)
