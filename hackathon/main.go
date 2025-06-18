@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"time"  
 	_ "github.com/go-sql-driver/mysql"
 	"net/http"
 	"os"
@@ -19,7 +20,7 @@ import (
 )
 
 type UserResForHTTPGet struct {
-	ID        string `json:"id"`         // JSONキーを "id" にする
+	ID        string `json:"id"`         // JSONキーを "id" にするtime
     UserID    string `json:"user_id"`    // JSONキーを "user_id" にする
     Content   string `json:"content"`
     CreatedAt time.Time `json:"created_at"` // JSONキーを "created_at" にする
@@ -207,7 +208,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 		posts := make([]UserResForHTTPGet, 0)
 		for rows.Next() {
 			var u UserResForHTTPGet
-			if err := rows.Scan(&u.ID, &UserID, &u.Content, &u.CreatedAt); err != nil {
+			if err := rows.Scan(&u.ID, &u.UserID, &u.Content, &u.CreatedAt); err != nil {
 				log.Printf("fail: rows.Scan, %v\n", err)
 				if err := rows.Close(); err != nil {
 					log.Printf("fail: rows.Close(), %v\n", err)
