@@ -61,7 +61,7 @@ func init() {
 func generateUUID() string {
 	return uuid.New().String() 
 }
-
+//respondWithError
 func userhandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -221,7 +221,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
             	p.id, u.Username, p.content, p.created_at
         	ORDER BY 
             	p.created_at DESC`
-		rows, err := db.Query(query, currentUserID)
+		rows, err := db.Query(query, id)
 		if err != nil {
 			log.Printf("fail: db.Query, %v\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -273,13 +273,13 @@ func likehandler(w http.ResponseWriter, r *http.Request) {
     client, err := firebaseApp.Auth(ctx)
     if err != nil {
         log.Printf("fail: get firebase auth client, %v\n", err)
-        respondWithError(w, http.StatusInternalServerError, "認証クライアントの取得に失敗しました。")
+		w.WriteHeader(http.StatusInternalServerError)
         return
     }
     token, err := client.VerifyIDToken(ctx, idToken)
     if err != nil {
         log.Printf("fail: verify ID token, %v\n", err)
-        respondWithError(w, http.StatusUnauthorized, "IDトークンの検証に失敗しました。認証が必要です。")
+		w.WriteHeader(http.StatusUnauthorized)
         return
     }
     likingUserID := token.UID 
@@ -287,20 +287,21 @@ func likehandler(w http.ResponseWriter, r *http.Request) {
     var reqBody LikeRequest
     if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
         log.Printf("fail: decode request body, %v\n", err)
-        respondWithError(w, http.StatusBadRequest, "リクエストボディの解析に失敗しました。")
+		w.WriteHeader(http.StatusBadRequest)
         return
     }
     postID := reqBody.PostID
 
     if postID == "" {
-        respondWithError(w, http.StatusBadRequest, "PostIDが指定されていません。")
+		w.WriteHeader(http.StatusBadRequest)
+		log.Printf("fail: no postID, %v\n", err)
         return
     }
 
     tx, err := db.Begin()
     if err != nil {
         log.Printf("fail: db.Begin, %v\n", err)
-        respondWithError(w, http.StatusInternalServerError, "トランザクションの開始に失敗しました。")
+		w.WriteHeader(http.StatusInternalServerError)
         return
     }
     defer tx.Rollback() 
@@ -311,7 +312,7 @@ func likehandler(w http.ResponseWriter, r *http.Request) {
         stmt, err := tx.Prepare("INSERT INTO likes (id, post_id, user_id) VALUES (?, ?, ?)")
         if err != nil {
             log.Printf("fail: tx.Prepare INSERT, %v\n", err)
-            respondWithError(w, http.StatusInternalServerError, "SQLステートメントの準備に失敗しました。")
+			w.WriteHeader(http.StatusInternalServerError)
             return
         }
         defer stmt.Close()
@@ -320,16 +321,16 @@ func likehandler(w http.ResponseWriter, r *http.Request) {
         if err != nil {
             if strings.Contains(err.Error(), "Duplicate entry") { 
                 log.Printf("info: user %s already liked post %s\n", likingUserID, postID)
-                respondWithError(w, http.StatusConflict, "この投稿は既に「いいね」されています。")
+				w.WriteHeader(http.StatusConflict)
                 return
             }
             log.Printf("fail: stmt.Exec INSERT, %v\n", err)
-            respondWithError(w, http.StatusInternalServerError, "「いいね」の登録に失敗しました。")
+			w.WriteHeader(http.StatusInternalServerError)
             return
         }
         if err = tx.Commit(); err != nil {
             log.Printf("fail: tx.Commit INSERT, %v\n", err)
-            respondWithError(w, http.StatusInternalServerError, "「いいね」登録のコミットに失敗しました。")
+			w.WriteHeader(http.StatusInternalServerError)
             return
         }
         w.WriteHeader(http.StatusCreated) 
@@ -339,21 +340,21 @@ func likehandler(w http.ResponseWriter, r *http.Request) {
         stmt, err := tx.Prepare("DELETE FROM likes WHERE post_id = ? AND user_id = ?")
         if err != nil {
             log.Printf("fail: tx.Prepare DELETE, %v\n", err)
-            respondWithError(w, http.StatusInternalServerError, "SQLステートメントの準備に失敗しました。")
+			w.WriteHeader(http.StatusInternalServerError)
             return
         }
         defer stmt.Close()
         result, err := stmt.Exec(postID, likingUserID)
         if err != nil {
             log.Printf("fail: stmt.Exec DELETE, %v\n", err)
-            respondWithError(w, http.StatusInternalServerError, "「いいね」の解除に失敗しました。")
+			w.WriteHeader(http.StatusInternalServerError)
             return
         }
         w.WriteHeader(http.StatusOK) 
         log.Printf("User %s unliked post %s", likingUserID, postID)
 
     default:
-        respondWithError(w, http.StatusMethodNotAllowed, "許可されていないHTTPメソッドです。")
+		w.WriteHeader(http.StatusMethodNotAllowed)
     }
 }
 
