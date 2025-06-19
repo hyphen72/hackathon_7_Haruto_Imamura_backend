@@ -247,7 +247,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 		posts := make([]UserResForHTTPGet, 0)
 		for rows.Next() {
 			var u UserResForHTTPGet
-			if err := rows.Scan(&u.ID, &u.Username, &u.Content, &u.CreatedAt); err != nil {
+			if err := rows.Scan(&u.ID, &u.Username, &u.Content, &u.CreatedAt, &u.likesCount, &u.IsLikedByMe); err != nil {
 				log.Printf("fail: rows.Scan, %v\n", err)
 				if err := rows.Close(); err != nil {
 					log.Printf("fail: rows.Close(), %v\n", err)
@@ -271,7 +271,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-
+//rows.Scan
 
 func likehandler(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
