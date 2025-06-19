@@ -17,6 +17,7 @@ import (
     "firebase.google.com/go"
     "firebase.google.com/go/auth" 
     "google.golang.org/api/option"
+	"github.com/gorilla/mux"
 )
 
 type UserResForHTTPGet struct {
@@ -25,6 +26,7 @@ type UserResForHTTPGet struct {
     Content   string `json:"content"`
     CreatedAt time.Time `json:"created_at"`
 	LikesCount   int       `json:"likes_count"` 
+	ReplyCount   int	   `json:"reply_count"`
     IsLikedByMe  bool      `json:"is_liked_by_me"` 
 }
 type LikeRequest struct {
@@ -61,7 +63,6 @@ func init() {
 func generateUUID() string {
 	return uuid.New().String() 
 }
-//respondWithError
 func userhandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -165,6 +166,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 		id := token.UID
 		var reqBody struct {
 			Content string `json:"content"`
+			PostID string `json:"reply_id'`
 		}
 		err = json.NewDecoder(r.Body).Decode(&reqBody)
 		if err != nil {
@@ -173,6 +175,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		content := reqBody.Content
+		reply := reqBody.PostID
 		newPostID := generateUUID()
 		tx, err := db.Begin()
 		if err != nil {
@@ -180,7 +183,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("fail: db begin, %v\n", err)
 			return
 		}
-		stmt, err := db.Prepare("INSERT INTO posts(id, user_id, content_text) VALUES(?, ?, ?)")
+		stmt, err := db.Prepare("INSERT INTO posts(id, user_id, content_text,reply_to_post_id) VALUES(?, ?, ?, ?)")
 		if err != nil {
 			tx.Rollback()
 			log.Printf("insert into sql, %v\n", err)
@@ -188,7 +191,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer stmt.Close()
-		_, err = stmt.Exec(newPostID,id,content)
+		_, err = stmt.Exec(newPostID,id,content,reply)
 		if err != nil {
 			tx.Rollback()
 			log.Printf("fail:stmt, %v\n", err)
@@ -217,26 +220,29 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
         w.WriteHeader(http.StatusUnauthorized)
         log.Printf("fail: verify ID token, %v\n", err)
         return
-    	}
+		}
 		id := token.UID
 		query := `
-        	SELECT 
-            	p.id, 
-            	u.Username, 
-            	p.content_text, 
-            	p.created_at,
-            	COUNT(l.id) AS likes_count,
-            	CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) THEN TRUE ELSE FALSE END AS is_liked_by_me
-        	FROM 
-            	posts p
-			LEFT JOIN
-            	users u ON p.user_id = u.id 
-        	LEFT JOIN 
-            	likes l ON p.id = l.post_id
-        	GROUP BY
-            	p.id, u.Username, p.content_text, p.created_at
-        	ORDER BY 
-            	p.created_at DESC`
+		SELECT 
+            p.id, 
+            u.Username, 
+			p.content_text, 
+			p.created_at,
+            COUNT(l.id) AS likes_count,
+			(SELECT COUNT(*) FROM posts AS r WHERE r.reply_to_post_id = p.id) AS reply_count,
+            CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) THEN TRUE ELSE FALSE END AS is_liked_by_me
+        FROM 
+            posts p
+		LEFT JOIN
+			users u ON p.user_id = u.id 
+        LEFT JOIN 
+            likes l ON p.id = l.post_id
+		WHERE
+			p.reply_to_post_id IS NULL OR p.reply_to_post_id = ''
+		GROUP BY
+            p.id, u.Username, p.content_text, p.created_at
+		ORDER BY 
+            p.created_at DESC`
 		rows, err := db.Query(query, id)
 		if err != nil {
 			log.Printf("fail: db.Query, %v\n", err)
@@ -247,7 +253,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 		posts := make([]UserResForHTTPGet, 0)
 		for rows.Next() {
 			var u UserResForHTTPGet
-			if err := rows.Scan(&u.ID, &u.Username, &u.Content, &u.CreatedAt, &u.LikesCount, &u.IsLikedByMe); err != nil {
+			if err := rows.Scan(&u.ID, &u.Username, &u.Content, &u.CreatedAt, &u.LikesCount, &u.ReplyCount, &u.IsLikedByMe); err != nil {
 				log.Printf("fail: rows.Scan, %v\n", err)
 				if err := rows.Close(); err != nil {
 					log.Printf("fail: rows.Close(), %v\n", err)
@@ -271,7 +277,6 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-//rows.Scan
 
 func likehandler(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
@@ -352,7 +357,7 @@ func likehandler(w http.ResponseWriter, r *http.Request) {
         w.WriteHeader(http.StatusCreated) 
         log.Printf("User %s liked post %s", likingUserID, postID)
 
-    case http.MethodDelete:
+    case http.MethodGet:
         stmt, err := tx.Prepare("DELETE FROM likes WHERE post_id = ? AND user_id = ?")
         if err != nil {
             log.Printf("fail: tx.Prepare DELETE, %v\n", err)
@@ -395,6 +400,154 @@ func likehandler(w http.ResponseWriter, r *http.Request) {
     }
 }
 
+
+
+func replieshandler(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+    w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS") 
+    w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+    if r.Method == http.MethodOptions {
+        w.WriteHeader(http.StatusOK)
+        return
+    }
+
+    authHeader := r.Header.Get("Authorization")
+    idToken := strings.TrimPrefix(authHeader, "Bearer ")
+    ctx := r.Context()
+    client, err := firebaseApp.Auth(ctx)
+    if err != nil {
+        log.Printf("fail: get firebase auth client, %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+        return
+    }
+    token, err := client.VerifyIDToken(ctx, idToken)
+    if err != nil {
+        log.Printf("fail: verify ID token, %v\n", err)
+		w.WriteHeader(http.StatusUnauthorized)
+        return
+    }
+    id := token.UID 
+	vars := mux.Vars(r)
+	postID := vars["postId"]
+    switch r.Method {
+    case http.MethodGet:
+		query := `
+		SELECT 
+            p.id, 
+            u.Username, 
+			p.content_text, 
+			p.created_at,
+            COUNT(l.id) AS likes_count,
+			(SELECT COUNT(*) FROM posts AS r WHERE r.reply_to_post_id = p.id) AS reply_count,
+            CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) THEN TRUE ELSE FALSE END AS is_liked_by_me
+        FROM 
+            posts p
+		LEFT JOIN
+			users u ON p.user_id = u.id 
+        LEFT JOIN 
+            likes l ON p.id = l.post_id
+		WHERE
+			p.reply_to_post_id = ?
+		GROUP BY
+            p.id, u.Username, p.content_text, p.created_at, p.reply_to_post_id
+		ORDER BY 
+            p.created_at ASC`
+		rows, err := db.Query(query, id, postID)
+		if err != nil {
+			log.Printf("fail: db.Query, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+		posts := make([]UserResForHTTPGet, 0)
+		for rows.Next() {
+			var u UserResForHTTPGet
+			if err := rows.Scan(&u.ID, &u.Username, &u.Content, &u.CreatedAt, &u.LikesCount, &u.ReplyCount, &u.IsLikedByMe); err != nil {
+				log.Printf("fail: rows.Scan, %v\n", err)
+				if err := rows.Close(); err != nil {
+					log.Printf("fail: rows.Close(), %v\n", err)
+				}
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			posts = append(posts, u)
+		}
+		bytes, err := json.Marshal(posts)
+		if err != nil {
+			log.Printf("fail: json.Marshal, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(bytes)
+    default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+    }
+}
+func detailhandler(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+    w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS") 
+    w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+    if r.Method == http.MethodOptions {
+        w.WriteHeader(http.StatusOK)
+        return
+    }
+
+    authHeader := r.Header.Get("Authorization")
+    idToken := strings.TrimPrefix(authHeader, "Bearer ")
+    ctx := r.Context()
+    client, err := firebaseApp.Auth(ctx)
+    if err != nil {
+        log.Printf("fail: get firebase auth client, %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+        return
+    }
+    token, err := client.VerifyIDToken(ctx, idToken)
+    if err != nil {
+        log.Printf("fail: verify ID token, %v\n", err)
+		w.WriteHeader(http.StatusUnauthorized)
+        return
+    }
+    id := token.UID 
+	vars := mux.Vars(r)
+	postID := vars["postId"]
+    switch r.Method {
+    case http.MethodGet:
+		query := `
+		SELECT 
+            p.id, 
+            u.Username, 
+			p.content_text, 
+			p.created_at,
+            COUNT(l.id) AS likes_count,
+			(SELECT COUNT(*) FROM posts AS r WHERE r.reply_to_post_id = p.id) AS reply_count,
+            CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) THEN TRUE ELSE FALSE END AS is_liked_by_me
+        FROM 
+            posts p
+		LEFT JOIN
+			users u ON p.user_id = u.id 
+        LEFT JOIN 
+            likes l ON p.id = l.post_id
+		WHERE
+			p.id = ?
+		GROUP BY
+            p.id, u.Username, p.content_text, p.created_at
+		ORDER BY 
+            p.created_at DESC`
+		row := db.QueryRow(query, id, postID)
+		var p UserResForHTTPGet
+		row.Scan(&p.ID, &p.Username, &p.Content, &p.CreatedAt, &p.LikesCount, &p.ReplyCount, &p.IsLikedByMe);
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(p); err != nil {
+			log.Printf("エラー: JSONエンコードに失敗しました, %v\n", err)
+			return
+		}
+    default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+    }
+}
 
 func main() {
 	http.HandleFunc("/user", userhandler)
