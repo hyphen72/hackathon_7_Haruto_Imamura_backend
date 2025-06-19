@@ -357,17 +357,38 @@ func likehandler(w http.ResponseWriter, r *http.Request) {
         if err != nil {
             log.Printf("fail: tx.Prepare DELETE, %v\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
+			tx.Rollback()
             return
         }
         defer stmt.Close()
-        _, err = stmt.Exec(postID, likingUserID)
+        result, err = stmt.Exec(postID, likingUserID)
         if err != nil {
             log.Printf("fail: stmt.Exec DELETE, %v\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
+			tx.Rollback()
             return
         }
+		rowsAffected, err := res.RowsAffected()
+		if err != nil {
+
+        	log.Printf("fail: RowsAffected DELETE, %v\n", err)
+        	w.WriteHeader(http.StatusInternalServerError) 
+        	tx.Rollback()
+        	return
+    	}
+
+    	if rowsAffected == 0 {
+        	log.Printf("no matching record found.", likingUserID, postID)
+        	w.WriteHeader(http.StatusNotFound) 
+        	tx.Rollback() 
+        	return
+    	}
+		if err := tx.Commit(); err != nil { 
+        	log.Printf("fail: tx.Commit DELETE, %v\n", err)
+        	w.WriteHeader(http.StatusInternalServerError)
+        	return
+		}
         w.WriteHeader(http.StatusOK) 
-        log.Printf("User %s unliked post %s", likingUserID, postID)
 
     default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
