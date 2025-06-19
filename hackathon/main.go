@@ -203,6 +203,22 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusOK)
 	case http.MethodGet:
+		authHeader := r.Header.Get("Authorization")
+		idToken := strings.TrimPrefix(authHeader, "Bearer ")
+		ctx := r.Context() 
+    	client, err := firebaseApp.Auth(ctx)
+    	if err != nil {
+        	w.WriteHeader(http.StatusInternalServerError)
+        	log.Printf("fail: get firebase auth client, %v\n", err)
+        	return
+    	}
+		token, err := client.VerifyIDToken(ctx, idToken)
+    	if err != nil {
+        w.WriteHeader(http.StatusUnauthorized)
+        log.Printf("fail: verify ID token, %v\n", err)
+        return
+    	}
+		id := token.UID
 		query := `
         	SELECT 
             	p.id, 
@@ -344,7 +360,7 @@ func likehandler(w http.ResponseWriter, r *http.Request) {
             return
         }
         defer stmt.Close()
-        result, err := stmt.Exec(postID, likingUserID)
+        _, err := stmt.Exec(postID, likingUserID)
         if err != nil {
             log.Printf("fail: stmt.Exec DELETE, %v\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
