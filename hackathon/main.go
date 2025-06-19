@@ -361,14 +361,14 @@ func likehandler(w http.ResponseWriter, r *http.Request) {
             return
         }
         defer stmt.Close()
-        result, err = stmt.Exec(postID, likingUserID)
+        result, err := stmt.Exec(postID, likingUserID)
         if err != nil {
             log.Printf("fail: stmt.Exec DELETE, %v\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			tx.Rollback()
             return
         }
-		rowsAffected, err := res.RowsAffected()
+		rowsAffected, err := result.RowsAffected()
 		if err != nil {
 
         	log.Printf("fail: RowsAffected DELETE, %v\n", err)
