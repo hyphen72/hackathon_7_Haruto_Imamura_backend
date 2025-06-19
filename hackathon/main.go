@@ -360,7 +360,7 @@ func likehandler(w http.ResponseWriter, r *http.Request) {
             return
         }
         defer stmt.Close()
-        _, err := stmt.Exec(postID, likingUserID)
+        _, err = stmt.Exec(postID, likingUserID)
         if err != nil {
             log.Printf("fail: stmt.Exec DELETE, %v\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
