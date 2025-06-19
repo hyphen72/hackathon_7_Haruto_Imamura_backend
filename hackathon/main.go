@@ -20,11 +20,11 @@ import (
 )
 
 type UserResForHTTPGet struct {
-	ID        string `json:"id"`         // JSONキーを "id" にするtime
-    UserID    string `json:"user_id"`    // JSONキーを "user_id" にする
+	ID        string `json:"id"`     
+    Username    string `json:"username"` 
     Content   string `json:"content"`
-    CreatedAt time.Time `json:"created_at"` // JSONキーを "created_at" にする
-	LikesCount   int       `json:"likes_count"`     // ★追加：いいね数
+    CreatedAt time.Time `json:"created_at"`
+	LikesCount   int       `json:"likes_count"` 
     IsLikedByMe  bool      `json:"is_liked_by_me"` 
 }
 type LikeRequest struct {
@@ -206,17 +206,19 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 		query := `
         	SELECT 
             	p.id, 
-            	p.user_id, 
+            	u.Username, 
             	p.content, 
             	p.created_at,
             	COUNT(l.id) AS likes_count,
             	CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) THEN TRUE ELSE FALSE END AS is_liked_by_me
         	FROM 
             	posts p
+			LEFT JOIN
+            	users u ON p.user_id = u.id 
         	LEFT JOIN 
             	likes l ON p.id = l.post_id
         	GROUP BY
-            	p.id, p.user_id, p.content, p.created_at
+            	p.id, u.Username, p.content, p.created_at
         	ORDER BY 
             	p.created_at DESC`
 		rows, err := db.Query(query, currentUserID)
@@ -229,7 +231,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 		posts := make([]UserResForHTTPGet, 0)
 		for rows.Next() {
 			var u UserResForHTTPGet
-			if err := rows.Scan(&u.ID, &u.UserID, &u.Content, &u.CreatedAt); err != nil {
+			if err := rows.Scan(&u.ID, &u.Username, &u.Content, &u.CreatedAt); err != nil {
 				log.Printf("fail: rows.Scan, %v\n", err)
 				if err := rows.Close(); err != nil {
 					log.Printf("fail: rows.Close(), %v\n", err)
