@@ -24,6 +24,11 @@ type UserResForHTTPGet struct {
     UserID    string `json:"user_id"`    // JSONキーを "user_id" にする
     Content   string `json:"content"`
     CreatedAt time.Time `json:"created_at"` // JSONキーを "created_at" にする
+	LikesCount   int       `json:"likes_count"`     // ★追加：いいね数
+    IsLikedByMe  bool      `json:"is_liked_by_me"` 
+}
+type LikeRequest struct {
+    PostID string `json:"post_id"`
 }
 
 var db *sql.DB
@@ -198,7 +203,23 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusOK)
 	case http.MethodGet:
-		rows, err := db.Query("SELECT id, user_id, content_text, created_at FROM posts ORDER BY created_at DESC")
+		query := `
+        	SELECT 
+            	p.id, 
+            	p.user_id, 
+            	p.content, 
+            	p.created_at,
+            	COUNT(l.id) AS likes_count,
+            	CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) THEN TRUE ELSE FALSE END AS is_liked_by_me
+        	FROM 
+            	posts p
+        	LEFT JOIN 
+            	likes l ON p.id = l.post_id
+        	GROUP BY
+            	p.id, p.user_id, p.content, p.created_at
+        	ORDER BY 
+            	p.created_at DESC`
+		rows, err := db.Query(query, currentUserID)
 		if err != nil {
 			log.Printf("fail: db.Query, %v\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -233,10 +254,112 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+
+func likehandler(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+    w.Header().Set("Access-Control-Allow-Methods", "POST, DELETE, OPTIONS") 
+    w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+    if r.Method == http.MethodOptions {
+        w.WriteHeader(http.StatusOK)
+        return
+    }
+
+    authHeader := r.Header.Get("Authorization")
+    idToken := strings.TrimPrefix(authHeader, "Bearer ")
+    ctx := r.Context()
+    client, err := firebaseApp.Auth(ctx)
+    if err != nil {
+        log.Printf("fail: get firebase auth client, %v\n", err)
+        respondWithError(w, http.StatusInternalServerError, "認証クライアントの取得に失敗しました。")
+        return
+    }
+    token, err := client.VerifyIDToken(ctx, idToken)
+    if err != nil {
+        log.Printf("fail: verify ID token, %v\n", err)
+        respondWithError(w, http.StatusUnauthorized, "IDトークンの検証に失敗しました。認証が必要です。")
+        return
+    }
+    likingUserID := token.UID 
+
+    var reqBody LikeRequest
+    if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+        log.Printf("fail: decode request body, %v\n", err)
+        respondWithError(w, http.StatusBadRequest, "リクエストボディの解析に失敗しました。")
+        return
+    }
+    postID := reqBody.PostID
+
+    if postID == "" {
+        respondWithError(w, http.StatusBadRequest, "PostIDが指定されていません。")
+        return
+    }
+
+    tx, err := db.Begin()
+    if err != nil {
+        log.Printf("fail: db.Begin, %v\n", err)
+        respondWithError(w, http.StatusInternalServerError, "トランザクションの開始に失敗しました。")
+        return
+    }
+    defer tx.Rollback() 
+
+    switch r.Method {
+    case http.MethodPost:
+        likeID := generateUUID() 
+        stmt, err := tx.Prepare("INSERT INTO likes (id, post_id, user_id) VALUES (?, ?, ?)")
+        if err != nil {
+            log.Printf("fail: tx.Prepare INSERT, %v\n", err)
+            respondWithError(w, http.StatusInternalServerError, "SQLステートメントの準備に失敗しました。")
+            return
+        }
+        defer stmt.Close()
+
+        _, err = stmt.Exec(likeID, postID, likingUserID)
+        if err != nil {
+            if strings.Contains(err.Error(), "Duplicate entry") { 
+                log.Printf("info: user %s already liked post %s\n", likingUserID, postID)
+                respondWithError(w, http.StatusConflict, "この投稿は既に「いいね」されています。")
+                return
+            }
+            log.Printf("fail: stmt.Exec INSERT, %v\n", err)
+            respondWithError(w, http.StatusInternalServerError, "「いいね」の登録に失敗しました。")
+            return
+        }
+        if err = tx.Commit(); err != nil {
+            log.Printf("fail: tx.Commit INSERT, %v\n", err)
+            respondWithError(w, http.StatusInternalServerError, "「いいね」登録のコミットに失敗しました。")
+            return
+        }
+        w.WriteHeader(http.StatusCreated) 
+        log.Printf("User %s liked post %s", likingUserID, postID)
+
+    case http.MethodDelete:
+        stmt, err := tx.Prepare("DELETE FROM likes WHERE post_id = ? AND user_id = ?")
+        if err != nil {
+            log.Printf("fail: tx.Prepare DELETE, %v\n", err)
+            respondWithError(w, http.StatusInternalServerError, "SQLステートメントの準備に失敗しました。")
+            return
+        }
+        defer stmt.Close()
+        result, err := stmt.Exec(postID, likingUserID)
+        if err != nil {
+            log.Printf("fail: stmt.Exec DELETE, %v\n", err)
+            respondWithError(w, http.StatusInternalServerError, "「いいね」の解除に失敗しました。")
+            return
+        }
+        w.WriteHeader(http.StatusOK) 
+        log.Printf("User %s unliked post %s", likingUserID, postID)
+
+    default:
+        respondWithError(w, http.StatusMethodNotAllowed, "許可されていないHTTPメソッドです。")
+    }
+}
+
+
 func main() {
 	http.HandleFunc("/user", userhandler)
 	http.HandleFunc("/post", posthandler)
-
+	http.HandleFunc("/likes", likehandler)
 	// ③ Ctrl+CでHTTPサーバー停止時にDBをクローズする
 	closeDBWithSysCall()
 
