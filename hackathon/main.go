@@ -551,6 +551,8 @@ func detailhandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	http.HandleFunc("/user", userhandler)
+	http.HandleFunc("/post_detail/", detailhandler)
+	http.HandleFunc("/replies/", replieshandler)
 	http.HandleFunc("/post", posthandler)
 	http.HandleFunc("/likes", likehandler)
 	// ③ Ctrl+CでHTTPサーバー停止時にDBをクローズする
