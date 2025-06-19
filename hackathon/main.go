@@ -223,7 +223,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
         	SELECT 
             	p.id, 
             	u.Username, 
-            	p.content, 
+            	p.content_text, 
             	p.created_at,
             	COUNT(l.id) AS likes_count,
             	CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) THEN TRUE ELSE FALSE END AS is_liked_by_me
@@ -234,7 +234,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
         	LEFT JOIN 
             	likes l ON p.id = l.post_id
         	GROUP BY
-            	p.id, u.Username, p.content, p.created_at
+            	p.id, u.Username, p.content_text, p.created_at
         	ORDER BY 
             	p.created_at DESC`
 		rows, err := db.Query(query, id)
