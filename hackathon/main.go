@@ -165,7 +165,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
     	}
 		id := token.UID
 		var reqBody struct {
-			PostID string `json:"reply_id'`
+			PostID string `json:"reply_id"`
 			Content string `json:"content"`
 		}
 		err = json.NewDecoder(r.Body).Decode(&reqBody)
