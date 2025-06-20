@@ -165,8 +165,8 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
     	}
 		id := token.UID
 		var reqBody struct {
-			Content string `json:"content"`
 			PostID string `json:"reply_id'`
+			Content string `json:"content"`
 		}
 		err = json.NewDecoder(r.Body).Decode(&reqBody)
 		if err != nil {
@@ -192,7 +192,13 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer stmt.Close()
-		_, err = stmt.Exec(newPostID,id,content,reply)
+		var sqlReply sql.NullString
+        if reply != "" {
+            sqlReply = sql.NullString{String: reply, Valid: true}
+        } else {
+            sqlReply = sql.NullString{Valid: false}
+        }
+		_, err = stmt.Exec(newPostID,id,content,sqlReply)
 		if err != nil {
 			tx.Rollback()
 			log.Printf("fail:stmt, %v\n", err)
