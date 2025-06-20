@@ -27,7 +27,8 @@ type UserResForHTTPGet struct {
     CreatedAt time.Time `json:"created_at"`
 	LikesCount   int       `json:"likes_count"` 
 	ReplyCount   int	   `json:"reply_count"`
-    IsLikedByMe  bool      `json:"is_liked_by_me"` 
+    IsLikedByMe  bool      `json:"is_liked_by_me"`
+	ProfileImageUrl string `json:"profile_image_url"`
 }
 type LikeRequest struct {
     PostID string `json:"post_id"`
@@ -96,6 +97,7 @@ func userhandler(w http.ResponseWriter, r *http.Request) {
 		}
 		var reqBody struct {
 			Username string `json:"username"`
+			profileUrl string `json:"profileImageUrl"`
 		}
 		err = json.NewDecoder(r.Body).Decode(&reqBody)
 		if err != nil {
@@ -104,13 +106,14 @@ func userhandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		username := reqBody.Username
+		url := reqBody.profileUrl
 		tx, err := db.Begin()
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			log.Printf("fail: db begin, %v\n", err)
 			return
 		}
-		stmt, err := db.Prepare("INSERT INTO users(id, username, email) VALUES(?, ?, ?)")
+		stmt, err := db.Prepare("INSERT INTO users(id, username, email,profile_image_url ) VALUES(?, ?, ?, ?)")
 		if err != nil {
 			tx.Rollback()
 			log.Printf("insert into sql, %v\n", err)
@@ -118,7 +121,7 @@ func userhandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer stmt.Close()
-		_, err = stmt.Exec(id, username, email)
+		_, err = stmt.Exec(id, username, email, url)
 		if err != nil {
 			tx.Rollback()
 			log.Printf("fail:stmt, %v\n", err)
@@ -177,7 +180,6 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 		content := reqBody.Content
 		reply := reqBody.PostID
 		newPostID := generateUUID()
-		log.Printf("reply_id: %v", reply)
 		tx, err := db.Begin()
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -223,10 +225,10 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
         	return
     	}
 		token, err := client.VerifyIDToken(ctx, idToken)
-    	if err != nil {
-        w.WriteHeader(http.StatusUnauthorized)
-        log.Printf("fail: verify ID token, %v\n", err)
-        return
+		if err != nil {
+    		w.WriteHeader(http.StatusUnauthorized)
+        	log.Printf("fail: verify ID token, %v\n", err)
+        	return
 		}
 		id := token.UID
 		query := `
@@ -238,6 +240,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
             COUNT(l.id) AS likes_count,
 			(SELECT COUNT(*) FROM posts AS r WHERE r.reply_to_post_id = p.id) AS reply_count,
             CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) THEN TRUE ELSE FALSE END AS is_liked_by_me
+			u.profile_image_url
         FROM 
             posts p
 		LEFT JOIN
@@ -260,7 +263,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 		posts := make([]UserResForHTTPGet, 0)
 		for rows.Next() {
 			var u UserResForHTTPGet
-			if err := rows.Scan(&u.ID, &u.Username, &u.Content, &u.CreatedAt, &u.LikesCount, &u.ReplyCount, &u.IsLikedByMe); err != nil {
+			if err := rows.Scan(&u.ID, &u.Username, &u.Content, &u.CreatedAt, &u.LikesCount, &u.ReplyCount, &u.IsLikedByMe, &u.ProfileImageUrl); err != nil {
 				log.Printf("fail: rows.Scan, %v\n", err)
 				if err := rows.Close(); err != nil {
 					log.Printf("fail: rows.Close(), %v\n", err)
@@ -589,4 +592,4 @@ func closeDBWithSysCall() {
 		os.Exit(0)
 	}()
 }
-// git push用　メモメモ
+// git push用　メモ
