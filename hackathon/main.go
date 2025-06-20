@@ -490,7 +490,6 @@ func detailhandler(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
     w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS") 
     w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-
     if r.Method == http.MethodOptions {
         w.WriteHeader(http.StatusOK)
         return
@@ -514,13 +513,14 @@ func detailhandler(w http.ResponseWriter, r *http.Request) {
     id := token.UID 
 	vars := mux.Vars(r)
 	postID := vars["postId"]
+	log.Printf("postID:, %v\n", postID)
     switch r.Method {
     case http.MethodGet:
 		query := `
 		SELECT 
             p.id, 
             u.Username, 
-			p.content_text, 
+			p.content_text,
 			p.created_at,
             COUNT(l.id) AS likes_count,
 			(SELECT COUNT(*) FROM posts AS r WHERE r.reply_to_post_id = p.id) AS reply_count,
