@@ -551,17 +551,19 @@ func detailhandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	http.HandleFunc("/user", userhandler)
-	http.HandleFunc("/post_detail/", detailhandler)
-	http.HandleFunc("/replies/", replieshandler)
-	http.HandleFunc("/post", posthandler)
-	http.HandleFunc("/likes", likehandler)
+	router := mux.NewRouter()
+
+	router.HandleFunc("/user", userhandler).Methods("POST", "OPTIONS")
+    router.HandleFunc("/post_detail/{postId}", detailhandler).Methods("GET", "OPTIONS")
+    router.HandleFunc("/replies/{postId}", replieshandler).Methods("GET", "OPTIONS")
+    router.HandleFunc("/post", posthandler).Methods("GET", "POST", "OPTIONS")
+    router.HandleFunc("/likes", likehandler).Methods("POST", "DELETE", "OPTIONS")
 	// ③ Ctrl+CでHTTPサーバー停止時にDBをクローズする
 	closeDBWithSysCall()
 
 	// 8080番ポートでリクエストを待ち受ける
 	log.Println("Listening...")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	if err := http.ListenAndServe(":8080", router); err != nil {
 		log.Fatal(err)
 	}
 }
