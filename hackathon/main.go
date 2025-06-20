@@ -177,6 +177,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 		content := reqBody.Content
 		reply := reqBody.PostID
 		newPostID := generateUUID()
+		log.Printf("reply_id: %v", reply)
 		tx, err := db.Begin()
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
