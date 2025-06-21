@@ -97,16 +97,18 @@ func userhandler(w http.ResponseWriter, r *http.Request) {
 		}
 		var reqBody struct {
 			Username string `json:"username"`
-			profileUrl string `json:"profileImageUrl"`
+			ProfileImageUrl string `json:"profileImageUrl"`
 		}
 		err = json.NewDecoder(r.Body).Decode(&reqBody)
+		log.Printf("Received request body: %+v\n", reqBody)
+		log.Printf("Received profileUrl: %s\n", reqBody.ProfileImageUrl)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			log.Printf("fail: decode to json, %v\n", err)
 			return
 		}
 		username := reqBody.Username
-		url := reqBody.profileUrl
+		url := reqBody.ProfileImageUrl
 		var sqlurl sql.NullString
         if url != "" {
             sqlurl = sql.NullString{String: url, Valid: true}
