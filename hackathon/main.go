@@ -366,7 +366,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
         	LEFT JOIN users u ON p.user_id = u.id
         	LEFT JOIN likes l ON p.id = l.post_id
     	`
-    	whereClause := " WHERE 1=1 "
+    	whereClause := " WHERE p.reply_to_post_id IS NULL"
     	args := []interface{}{id}
     	if searchQuery != "" {
     	    whereClause += " AND (p.content_text LIKE ? OR u.Username LIKE ?) "
