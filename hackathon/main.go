@@ -359,7 +359,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
             COUNT(l.id) AS likes_count,
 			(SELECT COUNT(*) FROM posts AS r WHERE r.reply_to_post_id = p.id) AS reply_count,
             CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) THEN TRUE ELSE FALSE END AS is_liked_by_me,
-			u.profile_image_url
+			u.profile_image_url,
 			p.image_url
         FROM 
             posts p
@@ -571,7 +571,7 @@ func replieshandler(w http.ResponseWriter, r *http.Request) {
             COUNT(l.id) AS likes_count,
 			(SELECT COUNT(*) FROM posts AS r WHERE r.reply_to_post_id = p.id) AS reply_count,
             CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) THEN TRUE ELSE FALSE END AS is_liked_by_me,
-			u.profile_image_url
+			u.profile_image_url,
 			p.image_url
         FROM 
             posts p
@@ -656,7 +656,7 @@ func detailhandler(w http.ResponseWriter, r *http.Request) {
             COUNT(l.id) AS likes_count,
 			(SELECT COUNT(*) FROM posts AS r WHERE r.reply_to_post_id = p.id) AS reply_count,
             CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) THEN TRUE ELSE FALSE END AS is_liked_by_me,
-			u.profile_image_url
+			u.profile_image_url,
 			p.image_url
         FROM 
             posts p
