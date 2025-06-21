@@ -108,7 +108,7 @@ func init() {
 	log.Println("Geminiクライアントが正常に初期化されました。")
 }
 func moderatePostContent(ctx context.Context, postContent string) (ModResult, error) {
-	model := geminiClient.GenerativeModel("gemini-pro")
+	model := geminiClient.GenerativeModel("gemini-2.0-flash-001")
 
 	prompt := fmt.Sprintf(`以下のユーザー投稿を分析し、含まれる可能性のある問題（不適切なコンテンツ、スパム、フィッシング詐欺）を特定してください。
 各問題について、以下の基準で深刻度スコア（1: 軽微, 2: 注意, 3: 問題あり, 4: 深刻, 5: 極めて危険）を評価してください。
