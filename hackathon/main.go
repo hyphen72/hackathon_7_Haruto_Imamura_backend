@@ -29,6 +29,7 @@ type UserResForHTTPGet struct {
 	ReplyCount   int	   `json:"reply_count"`
     IsLikedByMe  bool      `json:"is_liked_by_me"`
 	ProfileImageUrl sql.NullString `json:"profile_image_url"`
+	ImageUrl sql.NullString `json:"image_url"`
 }
 type LikeRequest struct {
     PostID string `json:"post_id"`
@@ -279,6 +280,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 		var reqBody struct {
 			PostID string `json:"reply_id"`
 			Content string `json:"content"`
+			ImageUrl string `json:"imageUrl"`
 		}
 		err = json.NewDecoder(r.Body).Decode(&reqBody)
 		if err != nil {
@@ -288,6 +290,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 		}
 		content := reqBody.Content
 		reply := reqBody.PostID
+		image := reqBody.ImageUrl
 		newPostID := generateUUID()
 		tx, err := db.Begin()
 		if err != nil {
@@ -295,7 +298,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("fail: db begin, %v\n", err)
 			return
 		}
-		stmt, err := db.Prepare("INSERT INTO posts(id, user_id, content_text,reply_to_post_id) VALUES(?, ?, ?, ?)")
+		stmt, err := db.Prepare("INSERT INTO posts(id, user_id, content_text,reply_to_post_id, image_url) VALUES(?, ?, ?, ?, ?)")
 		if err != nil {
 			tx.Rollback()
 			log.Printf("insert into sql, %v\n", err)
@@ -309,7 +312,14 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
         } else {
             sqlReply = sql.NullString{Valid: false}
         }
-		_, err = stmt.Exec(newPostID,id,content,sqlReply)
+		var sqlImage sql.NullString
+        if image!= "" {
+            sqlImage = sql.NullString{String: image, Valid: true}
+        } else {
+            sqlImage = sql.NullString{Valid: false}
+        }
+
+		_, err = stmt.Exec(newPostID,id,content,sqlReply,sqlImage)
 		if err != nil {
 			tx.Rollback()
 			log.Printf("fail:stmt, %v\n", err)
@@ -350,6 +360,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 			(SELECT COUNT(*) FROM posts AS r WHERE r.reply_to_post_id = p.id) AS reply_count,
             CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) THEN TRUE ELSE FALSE END AS is_liked_by_me,
 			u.profile_image_url
+			p.image_url
         FROM 
             posts p
 		LEFT JOIN
@@ -372,7 +383,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 		posts := make([]UserResForHTTPGet, 0)
 		for rows.Next() {
 			var u UserResForHTTPGet
-			if err := rows.Scan(&u.ID, &u.Username, &u.Content, &u.CreatedAt, &u.LikesCount, &u.ReplyCount, &u.IsLikedByMe, &u.ProfileImageUrl); err != nil {
+			if err := rows.Scan(&u.ID, &u.Username, &u.Content, &u.CreatedAt, &u.LikesCount, &u.ReplyCount, &u.IsLikedByMe, &u.ProfileImageUrl, &u.ImageUrl); err != nil {
 				log.Printf("fail: rows.Scan, %v\n", err)
 				if err := rows.Close(); err != nil {
 					log.Printf("fail: rows.Close(), %v\n", err)
@@ -561,6 +572,7 @@ func replieshandler(w http.ResponseWriter, r *http.Request) {
 			(SELECT COUNT(*) FROM posts AS r WHERE r.reply_to_post_id = p.id) AS reply_count,
             CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) THEN TRUE ELSE FALSE END AS is_liked_by_me,
 			u.profile_image_url
+			p.image_url
         FROM 
             posts p
 		LEFT JOIN
@@ -583,7 +595,7 @@ func replieshandler(w http.ResponseWriter, r *http.Request) {
 		posts := make([]UserResForHTTPGet, 0)
 		for rows.Next() {
 			var u UserResForHTTPGet
-			if err := rows.Scan(&u.ID, &u.Username, &u.Content, &u.CreatedAt, &u.LikesCount, &u.ReplyCount, &u.IsLikedByMe, &u.ProfileImageUrl); err != nil {
+			if err := rows.Scan(&u.ID, &u.Username, &u.Content, &u.CreatedAt, &u.LikesCount, &u.ReplyCount, &u.IsLikedByMe, &u.ProfileImageUrl, &u.ImageUrl); err != nil {
 				log.Printf("fail: rows.Scan, %v\n", err)
 				if err := rows.Close(); err != nil {
 					log.Printf("fail: rows.Close(), %v\n", err)
@@ -645,6 +657,7 @@ func detailhandler(w http.ResponseWriter, r *http.Request) {
 			(SELECT COUNT(*) FROM posts AS r WHERE r.reply_to_post_id = p.id) AS reply_count,
             CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) THEN TRUE ELSE FALSE END AS is_liked_by_me,
 			u.profile_image_url
+			p.image_url
         FROM 
             posts p
 		LEFT JOIN
@@ -659,7 +672,7 @@ func detailhandler(w http.ResponseWriter, r *http.Request) {
             p.created_at DESC`
 		row := db.QueryRow(query, id, postID)
 		var p UserResForHTTPGet
-		row.Scan(&p.ID, &p.Username, &p.Content, &p.CreatedAt, &p.LikesCount, &p.ReplyCount, &p.IsLikedByMe, &p.ProfileImageUrl);
+		row.Scan(&p.ID, &p.Username, &p.Content, &p.CreatedAt, &p.LikesCount, &p.ReplyCount, &p.IsLikedByMe, &p.ProfileImageUrl, &p.ImageUrl);
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(p); err != nil {
 			log.Printf("エラー: JSONエンコードに失敗しました, %v\n", err)
