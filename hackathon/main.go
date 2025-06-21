@@ -108,8 +108,8 @@ func userhandler(w http.ResponseWriter, r *http.Request) {
 		username := reqBody.Username
 		url := reqBody.profileUrl
 		var sqlurl sql.NullString
-        if reply != "" {
-            sqlurl = sql.NullString{String: reply, Valid: true}
+        if url != "" {
+            sqlurl = sql.NullString{String: url, Valid: true}
         } else {
             sqlurl = sql.NullString{Valid: false}
         }
