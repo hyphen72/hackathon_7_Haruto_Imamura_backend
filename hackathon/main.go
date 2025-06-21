@@ -358,15 +358,12 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
         	    p.content, 
         	    p.created_at, 
         	    COUNT(DISTINCT l.id) AS likes_count,
-        	    COUNT(DISTINCT r.id) AS reply_count,
+        	    (SELECT COUNT(*) FROM posts AS r WHERE r.reply_to_post_id = p.id) AS reply_count,
         	    CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) THEN TRUE ELSE FALSE END AS is_liked_by_me,
         	    u.profile_image_url,
         	    p.image_url
-
         	FROM posts p
-
         	LEFT JOIN users u ON p.user_id = u.id
-
         	LEFT JOIN likes l ON p.id = l.post_id
     	`
     	whereClause := " WHERE 1=1 "
