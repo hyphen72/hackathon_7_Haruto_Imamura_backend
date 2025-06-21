@@ -558,7 +558,7 @@ func detailhandler(w http.ResponseWriter, r *http.Request) {
             p.created_at DESC`
 		row := db.QueryRow(query, id, postID)
 		var p UserResForHTTPGet
-		row.Scan(&p.ID, &p.Username, &p.Content, &p.CreatedAt, &p.LikesCount, &p.ReplyCount, &p.IsLikedByMe, &u.ProfileImageUrl);
+		row.Scan(&p.ID, &p.Username, &p.Content, &p.CreatedAt, &p.LikesCount, &p.ReplyCount, &p.IsLikedByMe, &p.ProfileImageUrl);
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(p); err != nil {
 			log.Printf("エラー: JSONエンコードに失敗しました, %v\n", err)
