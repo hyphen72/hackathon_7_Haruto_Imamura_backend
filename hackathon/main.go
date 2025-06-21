@@ -458,7 +458,8 @@ func replieshandler(w http.ResponseWriter, r *http.Request) {
 			p.created_at,
             COUNT(l.id) AS likes_count,
 			(SELECT COUNT(*) FROM posts AS r WHERE r.reply_to_post_id = p.id) AS reply_count,
-            CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) THEN TRUE ELSE FALSE END AS is_liked_by_me
+            CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) THEN TRUE ELSE FALSE END AS is_liked_by_me,
+			u.profile_image_url
         FROM 
             posts p
 		LEFT JOIN
@@ -481,7 +482,7 @@ func replieshandler(w http.ResponseWriter, r *http.Request) {
 		posts := make([]UserResForHTTPGet, 0)
 		for rows.Next() {
 			var u UserResForHTTPGet
-			if err := rows.Scan(&u.ID, &u.Username, &u.Content, &u.CreatedAt, &u.LikesCount, &u.ReplyCount, &u.IsLikedByMe); err != nil {
+			if err := rows.Scan(&u.ID, &u.Username, &u.Content, &u.CreatedAt, &u.LikesCount, &u.ReplyCount, &u.IsLikedByMe, &u.ProfileImageUrl); err != nil {
 				log.Printf("fail: rows.Scan, %v\n", err)
 				if err := rows.Close(); err != nil {
 					log.Printf("fail: rows.Close(), %v\n", err)
@@ -541,7 +542,8 @@ func detailhandler(w http.ResponseWriter, r *http.Request) {
 			p.created_at,
             COUNT(l.id) AS likes_count,
 			(SELECT COUNT(*) FROM posts AS r WHERE r.reply_to_post_id = p.id) AS reply_count,
-            CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) THEN TRUE ELSE FALSE END AS is_liked_by_me
+            CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) THEN TRUE ELSE FALSE END AS is_liked_by_me,
+			u.profile_image_url
         FROM 
             posts p
 		LEFT JOIN
@@ -556,7 +558,7 @@ func detailhandler(w http.ResponseWriter, r *http.Request) {
             p.created_at DESC`
 		row := db.QueryRow(query, id, postID)
 		var p UserResForHTTPGet
-		row.Scan(&p.ID, &p.Username, &p.Content, &p.CreatedAt, &p.LikesCount, &p.ReplyCount, &p.IsLikedByMe);
+		row.Scan(&p.ID, &p.Username, &p.Content, &p.CreatedAt, &p.LikesCount, &p.ReplyCount, &p.IsLikedByMe, &u.ProfileImageUrl);
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(p); err != nil {
 			log.Printf("エラー: JSONエンコードに失敗しました, %v\n", err)
