@@ -18,6 +18,7 @@ import (
     "firebase.google.com/go/auth" 
     "google.golang.org/api/option"
 	"github.com/gorilla/mux"
+	"cloud.google.com/go/vertexai/genai" 
 )
 
 type UserResForHTTPGet struct {
@@ -31,6 +32,17 @@ type UserResForHTTPGet struct {
 	ProfileImageUrl sql.NullString `json:"profile_image_url"`
 	ImageUrl sql.NullString `json:"image_url"`
 }
+type ReqNotification struct {
+	ID               string    `json:"id"`               
+	UserID           string    `json:"userId"` 
+	PostID           string    `json:"postId"`       
+	PostContent      string    `json:"postContent"`  
+	SourceUserID     string    `json:"sourceUserId"`    
+	SourceUsername   string    `json:"sourceUsername"`  
+	IsRead           bool      `json:"isRead"`           
+	CreatedAt        time.Time `json:"createdAt"`
+	NotificationType string    `json:"notificationType"` 
+}
 type LikeRequest struct {
     PostID string `json:"post_id"`
 }
@@ -38,6 +50,23 @@ type UserProfile struct {
 	Username    string `json:"username"`
 	ProfileImageUrl sql.NullString `json:"profile_image_url"`
 }
+type ModResult struct {
+	Status string  `json:"status"`
+	Issues []Issue `json:"issues,omitempty"`
+}
+type Issue struct {
+	Type     string `json:"type"`
+	Subtype  string `json:"subtype,omitempty"`
+	Severity int    `json:"severity"` 
+	Reason   string `json:"reason"`
+}
+type PostResponse struct {
+	Status  string  `json:"status"`
+	Message string  `json:"message"`
+	Issues  []Issue `json:"issues,omitempty"`
+	PostID  string  `json:"post_id,omitempty"`
+}
+var geminiClient *genai.Client
 var db *sql.DB
 var firebaseApp *firebase.App
 func init() {
@@ -64,7 +93,73 @@ func init() {
 	log.Println("Successfully connected to the database")
 
 	_ = auth.Client{} //エラー回避用
+
+	projectID := os.Getenv("GCLOUD_PROJECT_ID")
+	location := os.Getenv("GCLOUD_LOCATION")
+
+	if projectID == "" || location == "" {
+		log.Fatalf("環境変数 GCLOUD_PROJECT_ID および GCLOUD_LOCATION を設定してください。")
+	}
+	ctx := context.Background()
+	geminiClient, err = genai.NewClient(ctx, projectID, location)
+	if err != nil {
+		log.Fatalf("Geminiクライアントの初期化に失敗しました: %v", err)
+	}
+	log.Println("Geminiクライアントが正常に初期化されました。")
 }
+func moderatePostContent(ctx context.Context, postContent string) (ModResult, error) {
+	model := geminiClient.GenerativeModel("gemini-pro")
+
+	prompt := fmt.Sprintf(`以下のユーザー投稿を分析し、含まれる可能性のある問題（不適切なコンテンツ、スパム、フィッシング詐欺）を特定してください。
+各問題について、以下の基準で深刻度スコア（1: 軽微, 2: 注意, 3: 問題あり, 4: 深刻, 5: 極めて危険）を評価してください。
+問題が検出されない場合は 'clean' と回答してください。
+
+応答はJSON形式でお願いします。
+
+---
+検出カテゴリ定義:
+- 不適切なコンテンツ: ヘイトスピーチ、差別、暴言、性的な内容、暴力的な表現、ハラスメント、ハラスメントの示唆など。
+- スパム: 未承諾広告、過度なリンク、繰り返し投稿、意味のない内容、誤解を招くクリックベイト、偽情報、不適切な勧誘など。
+- フィッシング詐欺: ユーザーの個人情報や認証情報を騙し取ろうとする試み、偽サイトへの誘導、不正な金銭要求など。
+---
+
+問題のあるコンテンツの出力例:
+{
+	"status": "flagged",
+	"issues": [
+    {"type": "不適切なコンテンツ", "subtype": "暴言", "severity": 3, "reason": "特定の個人に対する侮辱的な言葉が含まれています。"},
+    {"type": "スパム", "subtype": "過度なリンク", "severity": 2, "reason": "関連性の低い外部宣伝リンクが多数あります。"}
+	]
+}
+
+問題のないコンテンツの出力例:
+{
+	"status": "clean"
+}
+
+投稿: '%s'
+`, postContent)
+
+	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	if err != nil {
+		log.Printf("Gemini API呼び出しエラー: %v", err)
+		return ModResult{Status: "error", Issues: []Issue{{Type: "システムエラー", Severity: 5, Reason: "Gemini APIの呼び出し中にエラーが発生しました。"}}}, fmt.Errorf("Gemini API呼び出しエラー: %w", err)
+	}
+
+	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
+		return ModResult{Status: "error", Issues: []Issue{{Type: "システムエラー", Severity: 5, Reason: "Geminiからのレスポンスに候補がありませんでした。"}}}, fmt.Errorf("no candidates in Gemini response")
+	}
+	text := string(resp.Candidates[0].Content.Parts[0].(genai.Text))
+	var result ModResult
+	err = json.Unmarshal([]byte(text), &result)
+	if err != nil {
+		log.Printf("GeminiレスポンスのJSONパースエラー: %v, レスポンス内容: %s", err, text)
+		return ModResult{Status: "error", Issues: []Issue{{Type: "システムエラー", Severity: 5, Reason: "Geminiからの応答JSONをパースできませんでした。"}}}, fmt.Errorf("JSONパースエラー: %w", err)
+	}
+
+	return result, nil
+}
+
 func generateUUID() string {
 	return uuid.New().String() 
 }
@@ -689,7 +784,101 @@ func detailhandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
     }
 }
+func notificationhandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+    w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS") 
+    w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	if r.Method == http.MethodOptions {
+        w.WriteHeader(http.StatusOK)
+        return
+    }
+    authHeader := r.Header.Get("Authorization")
+    idToken := strings.TrimPrefix(authHeader, "Bearer ")
+    ctx := r.Context()
+    client, err := firebaseApp.Auth(ctx)
+    if err != nil {
+        log.Printf("fail: get firebase auth client, %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+        return
+    }
+    token, err := client.VerifyIDToken(ctx, idToken)
+    if err != nil {
+        log.Printf("fail: verify ID token, %v\n", err)
+		w.WriteHeader(http.StatusUnauthorized)
+        return
+    }
+    id := token.UID 
+    switch r.Method {
+    case http.MethodGet:
+		query := `
+		SELECT 
+            n.id, 
+            n.post_id, 
+			p.content_text,
+			n.source_user_id,
+			u.username,
+			n.is_read,
+			n.created_at,
+			n.notification_type
+        FROM 
+            notification n
+		LEFT JOIN
+			users u ON n.source_user_id = u.id 
+        LEFT JOIN 
+            posts p ON n.post_id = p.id
+		WHERE
+			n.user_id = ? AND n.is_read = FALSE
+		ORDER BY 
+            n.created_at DESC`
+		row := db.QueryRow(query, id)
+		var p ReqNotification
+		row.Scan(&p.ID, &p.UserID, &p.PostID, &p.PostContent, &p.SourceUserID, &p.SourceUsername, &p.IsRead, &p.CreatedAt, &p.NotificationType);
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(p); err != nil {
+			log.Printf("エラー: JSONエンコードに失敗しました, %v\n", err)
+			return
+		}
+	case http.MethodPost:
 
+    default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+func countnotificationhandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+    w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS") 
+    w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	if r.Method == http.MethodOptions {
+        w.WriteHeader(http.StatusOK)
+        return
+    }
+    authHeader := r.Header.Get("Authorization")
+    idToken := strings.TrimPrefix(authHeader, "Bearer ")
+    ctx := r.Context()
+    client, err := firebaseApp.Auth(ctx)
+    if err != nil {
+        log.Printf("fail: get firebase auth client, %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+        return
+    }
+    token, err := client.VerifyIDToken(ctx, idToken)
+    if err != nil {
+        log.Printf("fail: verify ID token, %v\n", err)
+		w.WriteHeader(http.StatusUnauthorized)
+        return
+    }
+    id := token.UID 
+    switch r.Method {
+    case http.MethodGet:
+		query := `SELECT COUNT (*) FROM notifications WHERE user_id = ? AND is_read = FALSE`
+		row := db.QueryRow(query, id)
+		var count int
+		row.Scan(&count);
+		w.Header().Set("Content-Type", "application/json")
+    default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
 func main() {
 	router := mux.NewRouter()
 
@@ -698,6 +887,7 @@ func main() {
     router.HandleFunc("/replies/{postId}", replieshandler).Methods("GET", "OPTIONS")
     router.HandleFunc("/post", posthandler).Methods("GET", "POST", "OPTIONS")
     router.HandleFunc("/likes", likehandler).Methods("POST", "DELETE", "OPTIONS")
+	router.HandleFunc("/notification/unread", countnotificationhandler).Methods("GET", "OPTIONS")
 	// ③ Ctrl+CでHTTPサーバー停止時にDBをクローズする
 	closeDBWithSysCall()
 
