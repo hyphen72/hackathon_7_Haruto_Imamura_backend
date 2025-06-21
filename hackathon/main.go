@@ -365,11 +365,9 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 
         	FROM posts p
 
-        	JOIN users u ON p.user_id = u.id
+        	LEFT JOIN users u ON p.user_id = u.id
 
         	LEFT JOIN likes l ON p.id = l.post_id
-
-        	LEFT JOIN replies r ON p.id = r.post_id
     	`
     	whereClause := " WHERE 1=1 "
     	args := []interface{}{id}
