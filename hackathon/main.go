@@ -28,7 +28,7 @@ type UserResForHTTPGet struct {
 	LikesCount   int       `json:"likes_count"` 
 	ReplyCount   int	   `json:"reply_count"`
     IsLikedByMe  bool      `json:"is_liked_by_me"`
-	ProfileImageUrl string `json:"profile_image_url"`
+	ProfileImageUrl sql.NullString `json:"profile_image_url"`
 }
 type LikeRequest struct {
     PostID string `json:"post_id"`
@@ -107,13 +107,19 @@ func userhandler(w http.ResponseWriter, r *http.Request) {
 		}
 		username := reqBody.Username
 		url := reqBody.profileUrl
+		var sqlurl sql.NullString
+        if reply != "" {
+            sqlurl = sql.NullString{String: reply, Valid: true}
+        } else {
+            sqlurl = sql.NullString{Valid: false}
+        }
 		tx, err := db.Begin()
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			log.Printf("fail: db begin, %v\n", err)
 			return
 		}
-		stmt, err := db.Prepare("INSERT INTO users(id, username, email,profile_image_url ) VALUES(?, ?, ?, ?)")
+		stmt, err := db.Prepare("INSERT INTO users(id, username, email, profile_image_url ) VALUES(?, ?, ?, ?)")
 		if err != nil {
 			tx.Rollback()
 			log.Printf("insert into sql, %v\n", err)
@@ -121,7 +127,7 @@ func userhandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer stmt.Close()
-		_, err = stmt.Exec(id, username, email, url)
+		_, err = stmt.Exec(id, username, email, sqlurl)
 		if err != nil {
 			tx.Rollback()
 			log.Printf("fail:stmt, %v\n", err)
