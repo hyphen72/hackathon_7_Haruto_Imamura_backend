@@ -355,7 +355,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
         	SELECT 
         	    p.id, 
         	    u.username, 
-        	    p.content, 
+        	    p.content_text, 
         	    p.created_at, 
         	    COUNT(DISTINCT l.id) AS likes_count,
         	    (SELECT COUNT(*) FROM posts AS r WHERE r.reply_to_post_id = p.id) AS reply_count,
