@@ -350,30 +350,42 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
         	return
 		}
 		id := token.UID
-		query := `
-		SELECT 
-            p.id, 
-            u.Username, 
-			p.content_text, 
-			p.created_at,
-            COUNT(l.id) AS likes_count,
-			(SELECT COUNT(*) FROM posts AS r WHERE r.reply_to_post_id = p.id) AS reply_count,
-            CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) THEN TRUE ELSE FALSE END AS is_liked_by_me,
-			u.profile_image_url,
-			p.image_url
-        FROM 
-            posts p
-		LEFT JOIN
-			users u ON p.user_id = u.id 
-        LEFT JOIN 
-            likes l ON p.id = l.post_id
-		WHERE
-			p.reply_to_post_id IS NULL OR p.reply_to_post_id = ''
-		GROUP BY
-            p.id, u.Username, p.content_text, p.created_at
-		ORDER BY 
-            p.created_at DESC`
-		rows, err := db.Query(query, id)
+		searchQuery := r.URL.Query().Get("q")
+    	baseQuery := `
+        	SELECT 
+        	    p.id, 
+        	    u.username, 
+        	    p.content, 
+        	    p.created_at, 
+        	    COUNT(DISTINCT l.id) AS likes_count,
+        	    COUNT(DISTINCT r.id) AS reply_count,
+        	    CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) THEN TRUE ELSE FALSE END AS is_liked_by_me,
+        	    u.profile_image_url,
+        	    p.image_url
+
+        	FROM posts p
+
+        	JOIN users u ON p.user_id = u.id
+
+        	LEFT JOIN likes l ON p.id = l.post_id
+
+        	LEFT JOIN replies r ON p.id = r.post_id
+    	`
+    	whereClause := " WHERE 1=1 "
+    	args := []interface{}{id}
+    	if searchQuery != "" {
+    	    whereClause += " AND (p.content LIKE ? OR u.username LIKE ?) "
+    	    searchPattern := "%" + searchQuery + "%"
+    	    args = append(args, searchPattern, searchPattern)
+    	}
+   		groupByClause := `
+        	GROUP BY p.id, u.username, p.content, p.created_at, u.profile_image_url, p.image_url
+        	ORDER BY p.created_at DESC
+    	`
+    
+    	finalQuery := baseQuery + whereClause + groupByClause
+
+    	rows, err := db.Query(finalQuery,args... )
 		if err != nil {
 			log.Printf("fail: db.Query, %v\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
