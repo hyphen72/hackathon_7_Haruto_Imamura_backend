@@ -156,7 +156,7 @@ func moderatePostContent(ctx context.Context, postContent string) (ModResult, er
 		log.Printf("GeminiレスポンスのJSONパースエラー: %v, レスポンス内容: %s", err, text)
 		return ModResult{Status: "error", Issues: []Issue{{Type: "システムエラー", Severity: 5, Reason: "Geminiからの応答JSONをパースできませんでした。"}}}, fmt.Errorf("JSONパースエラー: %w", err)
 	}
-
+	log.Printf("result: %#v",result)
 	return result, nil
 }
 
@@ -427,6 +427,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		_, error = moderatePostContent(ctx,content)
 		w.WriteHeader(http.StatusOK)
 	case http.MethodGet:
 		authHeader := r.Header.Get("Authorization")
