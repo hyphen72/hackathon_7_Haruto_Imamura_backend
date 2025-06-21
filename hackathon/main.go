@@ -374,7 +374,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
     	    args = append(args, searchPattern, searchPattern)
     	}
    		groupByClause := `
-        	GROUP BY p.id, u.username, p.content, p.created_at, u.profile_image_url, p.image_url
+        	GROUP BY p.id, u.Username, p.content_text, p.created_at, u.profile_image_url, p.image_url
         	ORDER BY p.created_at DESC
     	`
     
