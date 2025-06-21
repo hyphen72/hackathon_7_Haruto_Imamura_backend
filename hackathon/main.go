@@ -494,7 +494,7 @@ func likehandler(w http.ResponseWriter, r *http.Request) {
         w.WriteHeader(http.StatusCreated) 
         log.Printf("User %s liked post %s", likingUserID, postID)
 
-    case http.MethodGet:
+    case http.MethodDelete:
         stmt, err := tx.Prepare("DELETE FROM likes WHERE post_id = ? AND user_id = ?")
         if err != nil {
             log.Printf("fail: tx.Prepare DELETE, %v\n", err)
