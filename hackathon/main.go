@@ -150,8 +150,18 @@ func moderatePostContent(ctx context.Context, postContent string) (ModResult, er
 		return ModResult{Status: "error", Issues: []Issue{{Type: "システムエラー", Severity: 5, Reason: "Geminiからのレスポンスに候補がありませんでした。"}}}, fmt.Errorf("no candidates in Gemini response")
 	}
 	text := string(resp.Candidates[0].Content.Parts[0].(genai.Text))
+	trimmedText := text
+	if strings.HasPrefix(trimmedText, "```json\n") {
+		trimmedText = strings.TrimPrefix(trimmedText, "```json\n")
+	}
+	if strings.HasSuffix(trimmedText, "\n```") {
+		trimmedText = strings.TrimSuffix(trimmedText, "\n```")
+	}
+	
+	trimmedText = strings.TrimSpace(trimmedText)
+
 	var result ModResult
-	err = json.Unmarshal([]byte(text), &result)
+	err = json.Unmarshal([]byte(trimmedText), &result)
 	if err != nil {
 		log.Printf("GeminiレスポンスのJSONパースエラー: %v, レスポンス内容: %s", err, text)
 		return ModResult{Status: "error", Issues: []Issue{{Type: "システムエラー", Severity: 5, Reason: "Geminiからの応答JSONをパースできませんでした。"}}}, fmt.Errorf("JSONパースエラー: %w", err)
@@ -159,7 +169,6 @@ func moderatePostContent(ctx context.Context, postContent string) (ModResult, er
 	log.Printf("result: %#v",result)
 	return result, nil
 }
-
 func generateUUID() string {
 	return uuid.New().String() 
 }
@@ -427,8 +436,108 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		_, err = moderatePostContent(ctx,content)
-		w.WriteHeader(http.StatusOK)
+		modresult, err := moderatePostContent(ctx,content)
+		if(modresult.Status == "flagged"){
+			maxSeverity := 0 
+    		isPhishing := false 
+    		for _, issue := range modresult.Issues {
+        		if issue.Severity > maxSeverity {
+            		maxSeverity = issue.Severity
+        		}
+        		if issue.Type == "フィッシング詐欺" { 
+            		isPhishing = true
+        		}
+    		} 
+	if maxSeverity >= 4 || isPhishing{
+		notification_id := generateUUID()
+		tx, err := db.Begin()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			log.Printf("fail: db begin, %v\n", err)
+			return
+		}
+		stmt, err := db.Prepare("INSERT INTO notifications(id, post_id, source_user_id, notification_type,content) VALUES(?, ?, ?, ?, ?)")
+		if err != nil {
+			tx.Rollback()
+			log.Printf("insert into sql, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		defer stmt.Close()
+		_, err = stmt.Exec(notification_id,newPostID,id,"delete", content)
+		if err != nil {
+			tx.Rollback()
+			log.Printf("fail:stmt, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if err = tx.Commit(); err != nil {
+			tx.Rollback()
+			log.Printf("fail: commit, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		tx, err = db.Begin()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			log.Printf("fail: db begin, %v\n", err)
+			return
+		}
+		stmt, err = db.Prepare("DELETE FROM posts WHERE id = ?")
+		if err != nil {
+			tx.Rollback()
+			log.Printf("insert into sql, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		defer stmt.Close()
+		_, err = stmt.Exec(newPostID)
+		if err != nil {
+			tx.Rollback()
+			log.Printf("fail:stmt, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if err = tx.Commit(); err != nil {
+			tx.Rollback()
+			log.Printf("fail: commit, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+    } else if maxSeverity >= 1 {
+		notification_id := generateUUID()
+		tx, err := db.Begin()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			log.Printf("fail: db begin, %v\n", err)
+			return
+		}
+		stmt, err := db.Prepare("INSERT INTO notifications(id, post_id, source_user_id, notification_type,content) VALUES(?, ?, ?, ?, ?)")
+		if err != nil {
+			tx.Rollback()
+			log.Printf("insert into sql, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		defer stmt.Close()
+		_, err = stmt.Exec(notification_id,newPostID,id,"warn", content)
+		if err != nil {
+			tx.Rollback()
+			log.Printf("fail:stmt, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if err = tx.Commit(); err != nil {
+			tx.Rollback()
+			log.Printf("fail: commit, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+    }
+}
+	w.WriteHeader(http.StatusOK)
+
+
 	case http.MethodGet:
 		authHeader := r.Header.Get("Authorization")
 		idToken := strings.TrimPrefix(authHeader, "Bearer ")
@@ -815,7 +924,7 @@ func notificationhandler(w http.ResponseWriter, r *http.Request) {
 		SELECT 
             n.id, 
             n.post_id, 
-			p.content_text,
+			n.content,
 			n.source_user_id,
 			u.username,
 			n.is_read,
@@ -825,8 +934,6 @@ func notificationhandler(w http.ResponseWriter, r *http.Request) {
             notification n
 		LEFT JOIN
 			users u ON n.source_user_id = u.id 
-        LEFT JOIN 
-            posts p ON n.post_id = p.id
 		WHERE
 			n.user_id = ? AND n.is_read = FALSE
 		ORDER BY 
