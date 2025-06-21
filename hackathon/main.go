@@ -427,7 +427,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		_, error = moderatePostContent(ctx,content)
+		_, err = moderatePostContent(ctx,content)
 		w.WriteHeader(http.StatusOK)
 	case http.MethodGet:
 		authHeader := r.Header.Get("Authorization")
