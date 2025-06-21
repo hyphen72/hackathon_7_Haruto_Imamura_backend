@@ -33,7 +33,10 @@ type UserResForHTTPGet struct {
 type LikeRequest struct {
     PostID string `json:"post_id"`
 }
-
+type UserProfile struct {
+	Username    string `json:"username"`
+	ProfileImageUrl sql.NullString `json:"profile_image_url"`
+}
 var db *sql.DB
 var firebaseApp *firebase.App
 func init() {
@@ -130,6 +133,104 @@ func userhandler(w http.ResponseWriter, r *http.Request) {
 		}
 		defer stmt.Close()
 		_, err = stmt.Exec(id, username, email, sqlurl)
+		if err != nil {
+			tx.Rollback()
+			log.Printf("fail:stmt, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if err = tx.Commit(); err != nil {
+			tx.Rollback()
+			log.Printf("fail: commit, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	case http.MethodGet:
+		authHeader := r.Header.Get("Authorization")
+    	idToken := strings.TrimPrefix(authHeader, "Bearer ")
+    	ctx := r.Context()
+    	client, err := firebaseApp.Auth(ctx)
+    	if err != nil {
+        	log.Printf("fail: get firebase auth client, %v\n", err)
+        	w.WriteHeader(http.StatusInternalServerError)
+        	return
+    	}
+    	token, err := client.VerifyIDToken(ctx, idToken)
+    	if err != nil {
+        	log.Printf("fail: verify ID token, %v\n", err)
+        	w.WriteHeader(http.StatusUnauthorized)
+        	return
+    	}
+    	id := token.UID 
+        query := `
+        SELECT 
+            u.Username, 
+            u.profile_image_url
+        FROM 
+            users u
+        WHERE
+            u.id = ?`
+        row := db.QueryRow(query, id)
+        var p UserProfile
+        row.Scan(&p.Username,&p.ProfileImageUrl);
+        w.Header().Set("Content-Type", "application/json")
+        if err := json.NewEncoder(w).Encode(p); err != nil {
+            log.Printf("エラー: JSONエンコードに失敗しました, %v\n", err)
+            return
+        }
+	case http.MethodPut:
+		authHeader := r.Header.Get("Authorization")
+		idToken := strings.TrimPrefix(authHeader, "Bearer ")
+		ctx := r.Context() 
+    	client, err := firebaseApp.Auth(ctx)
+    	if err != nil {
+        	w.WriteHeader(http.StatusInternalServerError)
+        	log.Printf("fail: get firebase auth client, %v\n", err)
+        	return
+    	}
+		token, err := client.VerifyIDToken(ctx, idToken)
+    	if err != nil {
+        	w.WriteHeader(http.StatusUnauthorized)
+        	log.Printf("fail: verify ID token, %v\n", err)
+        	return
+    	}
+		id := token.UID
+		var reqBody struct {
+			Username string `json:"username"`
+			ProfileImageUrl string `json:"profileImageUrl"`
+		}
+		err = json.NewDecoder(r.Body).Decode(&reqBody)
+		log.Printf("Received request body: %+v\n", reqBody)
+		log.Printf("Received profileUrl: %s\n", reqBody.ProfileImageUrl)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			log.Printf("fail: decode to json, %v\n", err)
+			return
+		}
+		username := reqBody.Username
+		url := reqBody.ProfileImageUrl
+		var sqlurl sql.NullString
+        if url != "" {
+            sqlurl = sql.NullString{String: url, Valid: true}
+        } else {
+            sqlurl = sql.NullString{Valid: false}
+        }
+		tx, err := db.Begin()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			log.Printf("fail: db begin, %v\n", err)
+			return
+		}
+		stmt, err := db.Prepare("UPDATE users SET username = ?,profile_image_url = ? WHERE id = ?;" )
+		if err != nil {
+			tx.Rollback()
+			log.Printf("insert into sql, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		defer stmt.Close()
+		_, err = stmt.Exec(username, sqlurl, id)
 		if err != nil {
 			tx.Rollback()
 			log.Printf("fail:stmt, %v\n", err)
@@ -572,7 +673,7 @@ func detailhandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	router := mux.NewRouter()
 
-	router.HandleFunc("/user", userhandler).Methods("POST", "OPTIONS")
+	router.HandleFunc("/user", userhandler).Methods("POST","GET","PUT", "OPTIONS")
     router.HandleFunc("/post_detail/{postId}", detailhandler).Methods("GET", "OPTIONS")
     router.HandleFunc("/replies/{postId}", replieshandler).Methods("GET", "OPTIONS")
     router.HandleFunc("/post", posthandler).Methods("GET", "POST", "OPTIONS")
