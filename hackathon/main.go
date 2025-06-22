@@ -1084,16 +1084,26 @@ func notificationhandler(w http.ResponseWriter, r *http.Request) {
 			n.created_at,
 			n.notification_type
         FROM 
-            notification n
+            notifications n
 		LEFT JOIN
 			users u ON n.source_user_id = u.id 
 		WHERE
 			n.user_id = ? AND n.is_read = 0
 		ORDER BY 
             n.created_at DESC`
-		row := db.QueryRow(query, id)
-		var p ReqNotification
-		row.Scan(&p.ID, &p.UserID, &p.PostID, &p.PostContent, &p.SourceUserID, &p.SourceUsername, &p.IsRead, &p.CreatedAt, &p.NotificationType);
+		rows, err := db.Query(query, id)
+		defer rows.Close()
+		notifications := []ReqNotification{} // 通知のスライスを初期化
+    	for rows.Next() { // 行を1つずつ処理
+        	var n ReqNotification
+        	if err := rows.Scan(&n.ID, &n.UserID, &n.PostID, &n.PostContent, &n.SourceUserID, &n.SourceUsername, &n.IsRead, &n.CreatedAt, &n.NotificationType); err != nil {
+            	log.Printf("fail: rows.Scan notification, %v\n", err)
+            	w.WriteHeader(http.StatusInternalServerError)
+            	return
+        	}
+        	notifications = append(notifications, n)
+    	}
+
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(p); err != nil {
 			log.Printf("エラー: JSONエンコードに失敗しました, %v\n", err)
