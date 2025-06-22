@@ -1091,7 +1091,7 @@ func notificationhandler(w http.ResponseWriter, r *http.Request) {
 			n.user_id = ? AND n.is_read = 0
 		ORDER BY 
             n.created_at DESC`
-		rows, err := db.Query(query, id)
+		rows, _ := db.Query(query, id)
 		defer rows.Close()
 		notifications := []ReqNotification{} // 通知のスライスを初期化
     	for rows.Next() { // 行を1つずつ処理
@@ -1105,7 +1105,7 @@ func notificationhandler(w http.ResponseWriter, r *http.Request) {
     	}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(p); err != nil {
+		if err := json.NewEncoder(w).Encode(notifications); err != nil {
 			log.Printf("エラー: JSONエンコードに失敗しました, %v\n", err)
 			return
 		}
