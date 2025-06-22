@@ -440,6 +440,9 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if reply != "" {
+			queryUser := `SELECT user_id FROM posts WHERE post_id = ?`
+    		var userID string
+    		err := db.QueryRow(queryUser, newPostID).Scan(&userID)
 			notification_id := generateUUID()
 			tx, err := db.Begin()
 			if err != nil {
@@ -447,7 +450,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 				log.Printf("fail: db begin, %v\n", err)
 				return
 			}
-			stmt, err = db.Prepare("INSERT INTO notifications(id, post_id, source_user_id, notification_type) VALUES(?, ?, ?, ?)")
+			stmt, err = db.Prepare("INSERT INTO notifications(id, post_id,user_id, source_user_id, notification_type) VALUES(?, ?, ?, ?)")
 			if err != nil {
 				tx.Rollback()
 				log.Printf("insert into sql, %v\n", err)
@@ -455,7 +458,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			defer stmt.Close()
-			_, err = stmt.Exec(notification_id,reply,id,"reply")
+			_, err = stmt.Exec(notification_id,reply,userID,id,"reply")
 			if err != nil {
 				tx.Rollback()
 				log.Printf("fail:stmt, %v\n", err)
@@ -729,6 +732,9 @@ func likehandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
             return
         }
+		query := `SELECT user_id FROM posts WHERE post_id = ?`
+		var userID string
+		err = db.QueryRow(query, postID).Scan(&userID)
 		notification_id := generateUUID()
 		tx, err := db.Begin()
 		if err != nil {
@@ -736,7 +742,7 @@ func likehandler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("fail: db begin, %v\n", err)
 			return
 		}
-		stmt, err = db.Prepare("INSERT INTO notifications(id, post_id, source_user_id, notification_type) VALUES(?, ?, ?, ?)")
+		stmt, err = db.Prepare("INSERT INTO notifications(id, post_id,user_id,source_user_id, notification_type) VALUES(?, ?, ?, ?, ?)")
 		if err != nil {
 			tx.Rollback()
 			log.Printf("insert into sql, %v\n", err)
@@ -744,7 +750,7 @@ func likehandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer stmt.Close()
-		_, err = stmt.Exec(notification_id,postID,likingUserID,"like")
+		_, err = stmt.Exec(notification_id,postID,userID,likingUserID,"like")
 		if err != nil {
 			tx.Rollback()
 			log.Printf("fail:stmt, %v\n", err)
