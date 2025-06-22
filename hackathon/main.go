@@ -176,7 +176,21 @@ func generateUUID() string {
 	return uuid.New().String() 
 }
 func userhandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+	allowedOrigins := []string{
+		"http://localhost:3000",
+		"https://hackathon-7-haruto-imamura-frontend-razvufh8d.vercel.app",
+	}
+	origin := r.Header.Get("Origin")
+	isAllowed := false
+	for _, allowed := range allowedOrigins {
+    	if origin == allowed {
+        	isAllowed = true
+        	break
+    	}
+	}
+	if isAllowed {
+    w.Header().Set("Access-Control-Allow-Origin", origin)
+	}
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	switch r.Method {
@@ -360,7 +374,21 @@ func userhandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func posthandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+	allowedOrigins := []string{
+		"http://localhost:3000",
+		"https://hackathon-7-haruto-imamura-frontend-razvufh8d.vercel.app",
+	}
+	origin := r.Header.Get("Origin")
+	isAllowed := false
+	for _, allowed := range allowedOrigins {
+    	if origin == allowed {
+        	isAllowed = true
+        	break
+    	}
+	}
+	if isAllowed {
+    w.Header().Set("Access-Control-Allow-Origin", origin)
+	}
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	switch r.Method {
@@ -657,7 +685,21 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func likehandler(w http.ResponseWriter, r *http.Request) {
-    w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+    allowedOrigins := []string{
+		"http://localhost:3000",
+		"https://hackathon-7-haruto-imamura-frontend-razvufh8d.vercel.app",
+	}
+	origin := r.Header.Get("Origin")
+	isAllowed := false
+	for _, allowed := range allowedOrigins {
+    	if origin == allowed {
+        	isAllowed = true
+        	break
+    	}
+	}
+	if isAllowed {
+    w.Header().Set("Access-Control-Allow-Origin", origin)
+	}
     w.Header().Set("Access-Control-Allow-Methods", "POST, DELETE, OPTIONS") 
     w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
@@ -750,6 +792,7 @@ func likehandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer stmt.Close()
+		log.Printf("userID: %s, postID: %s, likingUserID: %s, notification_id: %s\n", userID, postID, likingUserID, notification_id)
 		_, err = stmt.Exec(notification_id,postID,userID,likingUserID,"like")
 		if err != nil {
 			tx.Rollback()
@@ -812,7 +855,21 @@ func likehandler(w http.ResponseWriter, r *http.Request) {
 
 
 func replieshandler(w http.ResponseWriter, r *http.Request) {
-    w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+    allowedOrigins := []string{
+		"http://localhost:3000",
+		"https://hackathon-7-haruto-imamura-frontend-razvufh8d.vercel.app",
+	}
+	origin := r.Header.Get("Origin")
+	isAllowed := false
+	for _, allowed := range allowedOrigins {
+    	if origin == allowed {
+        	isAllowed = true
+        	break
+    	}
+	}
+	if isAllowed {
+    w.Header().Set("Access-Control-Allow-Origin", origin)
+	}
     w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS") 
     w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
@@ -897,7 +954,21 @@ func replieshandler(w http.ResponseWriter, r *http.Request) {
     }
 }
 func detailhandler(w http.ResponseWriter, r *http.Request) {
-    w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+    allowedOrigins := []string{
+		"http://localhost:3000",
+		"https://hackathon-7-haruto-imamura-frontend-razvufh8d.vercel.app",
+	}
+	origin := r.Header.Get("Origin")
+	isAllowed := false
+	for _, allowed := range allowedOrigins {
+    	if origin == allowed {
+        	isAllowed = true
+        	break
+    	}
+	}
+	if isAllowed {
+    w.Header().Set("Access-Control-Allow-Origin", origin)
+	}
     w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS") 
     w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
     if r.Method == http.MethodOptions {
@@ -962,7 +1033,21 @@ func detailhandler(w http.ResponseWriter, r *http.Request) {
     }
 }
 func notificationhandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+	allowedOrigins := []string{
+		"http://localhost:3000",
+		"https://hackathon-7-haruto-imamura-frontend-razvufh8d.vercel.app",
+	}
+	origin := r.Header.Get("Origin")
+	isAllowed := false
+	for _, allowed := range allowedOrigins {
+    	if origin == allowed {
+        	isAllowed = true
+        	break
+    	}
+	}
+	if isAllowed {
+    w.Header().Set("Access-Control-Allow-Origin", origin)
+	}
     w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS") 
     w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	if r.Method == http.MethodOptions {
@@ -1034,7 +1119,21 @@ func notificationhandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 func countnotificationhandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+	allowedOrigins := []string{
+		"http://localhost:3000",
+		"https://hackathon-7-haruto-imamura-frontend-razvufh8d.vercel.app",
+	}
+	origin := r.Header.Get("Origin")
+	isAllowed := false
+	for _, allowed := range allowedOrigins {
+    	if origin == allowed {
+        	isAllowed = true
+        	break
+    	}
+	}
+	if isAllowed {
+    w.Header().Set("Access-Control-Allow-Origin", origin)
+	}
     w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS") 
     w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	if r.Method == http.MethodOptions {
