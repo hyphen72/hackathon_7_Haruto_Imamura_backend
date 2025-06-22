@@ -1004,8 +1004,6 @@ func notificationhandler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("エラー: JSONエンコードに失敗しました, %v\n", err)
 			return
 		}
-	case http.MethodPost:
-
     default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
@@ -1054,6 +1052,7 @@ func main() {
     router.HandleFunc("/post", posthandler).Methods("GET", "POST", "OPTIONS")
     router.HandleFunc("/likes", likehandler).Methods("POST", "DELETE", "OPTIONS")
 	router.HandleFunc("/notification/unread", countnotificationhandler).Methods("GET", "OPTIONS")
+	router.HandleFunc("/notifications", notificationhandler).Methods("GET", "OPTIONS")
 	// ③ Ctrl+CでHTTPサーバー停止時にDBをクローズする
 	closeDBWithSysCall()
 
