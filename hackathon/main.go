@@ -1093,8 +1093,8 @@ func notificationhandler(w http.ResponseWriter, r *http.Request) {
             n.created_at DESC`
 		rows, _ := db.Query(query, id)
 		defer rows.Close()
-		notifications := []ReqNotification{} // 通知のスライスを初期化
-    	for rows.Next() { // 行を1つずつ処理
+		notifications := []ReqNotification{}
+    	for rows.Next() {
         	var n ReqNotification
         	if err := rows.Scan(&n.ID, &n.UserID, &n.PostID, &n.PostContent, &n.SourceUserID, &n.SourceUsername, &n.IsRead, &n.CreatedAt, &n.NotificationType); err != nil {
             	log.Printf("fail: rows.Scan notification, %v\n", err)
