@@ -1074,7 +1074,8 @@ func notificationhandler(w http.ResponseWriter, r *http.Request) {
     case http.MethodGet:
 		query := `
 		SELECT 
-            n.id, 
+            n.id,
+			n.user_id,
             n.post_id, 
 			n.content,
 			n.source_user_id,
@@ -1091,7 +1092,7 @@ func notificationhandler(w http.ResponseWriter, r *http.Request) {
 		ORDER BY 
             n.created_at DESC`
 		row := db.QueryRow(query, id)
-		console.log(row)
+		log.Printf(row)
 		var p ReqNotification
 		row.Scan(&p.ID, &p.UserID, &p.PostID, &p.PostContent, &p.SourceUserID, &p.SourceUsername, &p.IsRead, &p.CreatedAt, &p.NotificationType);
 		w.Header().Set("Content-Type", "application/json")
