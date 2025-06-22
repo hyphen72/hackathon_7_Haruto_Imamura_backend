@@ -1176,11 +1176,11 @@ func countnotificationhandler(w http.ResponseWriter, r *http.Request) {
 		response := countResponse{
             UnreadCount: count,
         }
+		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(response); err != nil {
             http.Error(w, fmt.Sprintf("Failed to encode response: %v", err), http.StatusInternalServerError)
             return
         }
-		w.Header().Set("Content-Type", "application/json")
     default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
