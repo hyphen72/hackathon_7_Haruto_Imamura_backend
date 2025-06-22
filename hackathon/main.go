@@ -1048,7 +1048,7 @@ func notificationhandler(w http.ResponseWriter, r *http.Request) {
 	if isAllowed {
     w.Header().Set("Access-Control-Allow-Origin", origin)
 	}
-    w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS") 
+    w.Header().Set("Access-Control-Allow-Methods", "GET,PUT, OPTIONS") 
     w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	if r.Method == http.MethodOptions {
         w.WriteHeader(http.StatusOK)
@@ -1183,7 +1183,8 @@ func main() {
     router.HandleFunc("/post", posthandler).Methods("GET", "POST", "OPTIONS")
     router.HandleFunc("/likes", likehandler).Methods("POST", "DELETE", "OPTIONS")
 	router.HandleFunc("/notification/unread", countnotificationhandler).Methods("GET", "OPTIONS")
-	router.HandleFunc("/notifications/{notificationID}", notificationhandler).Methods("GET", "OPTIONS")
+	router.HandleFunc("/notifications/{notificationID}", notificationhandler).Methods("PUT", "OPTIONS")
+	router.HandleFunc("/notifications", notificationhandler).Methods("GET", "OPTIONS")
 	// ③ Ctrl+CでHTTPサーバー停止時にDBをクローズする
 	closeDBWithSysCall()
 
