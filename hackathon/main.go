@@ -468,7 +468,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if reply != "" {
-			queryUser := `SELECT user_id FROM posts WHERE post_id = ?`
+			queryUser := `SELECT user_id FROM posts WHERE id = ?`
     		var userID string
     		err := db.QueryRow(queryUser, newPostID).Scan(&userID)
 			notification_id := generateUUID()
@@ -774,7 +774,7 @@ func likehandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
             return
         }
-		query := `SELECT user_id FROM posts WHERE post_id = ?`
+		query := `SELECT user_id FROM posts WHERE id = ?`
 		var userID string
 		err = db.QueryRow(query, postID).Scan(&userID)
 		notification_id := generateUUID()
