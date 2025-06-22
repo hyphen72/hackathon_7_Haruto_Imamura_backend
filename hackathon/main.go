@@ -36,7 +36,7 @@ type ReqNotification struct {
 	ID               string    `json:"id"`               
 	UserID           string    `json:"userId"` 
 	PostID           string    `json:"postId"`       
-	PostContent      string    `json:"postContent"`  
+	PostContent      sql.NullString    `json:"postContent"`  
 	SourceUserID     string    `json:"sourceUserId"`    
 	SourceUsername   string    `json:"sourceUsername"`  
 	IsRead           bool      `json:"isRead"`           
