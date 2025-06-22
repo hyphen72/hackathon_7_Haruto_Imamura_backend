@@ -178,6 +178,7 @@ func generateUUID() string {
 func userhandler(w http.ResponseWriter, r *http.Request) {
 	allowedOrigins := []string{
 		"http://localhost:3000",
+		"https://hackathon-7-haruto-imamura-frontend-dk3hodbxl.vercel.app",
 		"https://hackathon-7-haruto-imamura-frontend-razvufh8d.vercel.app",
 	}
 	origin := r.Header.Get("Origin")
@@ -377,6 +378,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 	allowedOrigins := []string{
 		"http://localhost:3000",
 		"https://hackathon-7-haruto-imamura-frontend-razvufh8d.vercel.app",
+		"https://hackathon-7-haruto-imamura-frontend-dk3hodbxl.vercel.app",
 	}
 	origin := r.Header.Get("Origin")
 	isAllowed := false
@@ -688,6 +690,7 @@ func likehandler(w http.ResponseWriter, r *http.Request) {
     allowedOrigins := []string{
 		"http://localhost:3000",
 		"https://hackathon-7-haruto-imamura-frontend-razvufh8d.vercel.app",
+		"https://hackathon-7-haruto-imamura-frontend-dk3hodbxl.vercel.app",
 	}
 	origin := r.Header.Get("Origin")
 	isAllowed := false
@@ -858,6 +861,7 @@ func replieshandler(w http.ResponseWriter, r *http.Request) {
     allowedOrigins := []string{
 		"http://localhost:3000",
 		"https://hackathon-7-haruto-imamura-frontend-razvufh8d.vercel.app",
+		"https://hackathon-7-haruto-imamura-frontend-dk3hodbxl.vercel.app",
 	}
 	origin := r.Header.Get("Origin")
 	isAllowed := false
@@ -957,6 +961,7 @@ func detailhandler(w http.ResponseWriter, r *http.Request) {
     allowedOrigins := []string{
 		"http://localhost:3000",
 		"https://hackathon-7-haruto-imamura-frontend-razvufh8d.vercel.app",
+		"https://hackathon-7-haruto-imamura-frontend-dk3hodbxl.vercel.app",
 	}
 	origin := r.Header.Get("Origin")
 	isAllowed := false
@@ -1036,6 +1041,7 @@ func notificationhandler(w http.ResponseWriter, r *http.Request) {
 	allowedOrigins := []string{
 		"http://localhost:3000",
 		"https://hackathon-7-haruto-imamura-frontend-razvufh8d.vercel.app",
+		"https://hackathon-7-haruto-imamura-frontend-dk3hodbxl.vercel.app",
 	}
 	origin := r.Header.Get("Origin")
 	isAllowed := false
@@ -1133,6 +1139,7 @@ func countnotificationhandler(w http.ResponseWriter, r *http.Request) {
 	allowedOrigins := []string{
 		"http://localhost:3000",
 		"https://hackathon-7-haruto-imamura-frontend-razvufh8d.vercel.app",
+		"https://hackathon-7-haruto-imamura-frontend-dk3hodbxl.vercel.app",
 	}
 	origin := r.Header.Get("Origin")
 	isAllowed := false
