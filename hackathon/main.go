@@ -66,6 +66,9 @@ type PostResponse struct {
 	Issues  []Issue `json:"issues,omitempty"`
 	PostID  string  `json:"post_id,omitempty"`
 }
+type countResponse struct {
+	UnreadCount int `json:"unreadCount"`
+}
 var geminiClient *genai.Client
 var db *sql.DB
 var firebaseApp *firebase.App
@@ -1037,7 +1040,14 @@ func countnotificationhandler(w http.ResponseWriter, r *http.Request) {
 		query := `SELECT COUNT (*) FROM notifications WHERE user_id = ? AND is_read = FALSE`
 		row := db.QueryRow(query, id)
 		var count int
-		row.Scan(&count);
+		row.Scan(&count)
+		response := countResponse{
+            UnreadCount: count,
+        }
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+            http.Error(w, fmt.Sprintf("Failed to encode response: %v", err), http.StatusInternalServerError)
+            return
+        }
 		w.Header().Set("Content-Type", "application/json")
     default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
