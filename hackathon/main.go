@@ -478,7 +478,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 				log.Printf("fail: db begin, %v\n", err)
 				return
 			}
-			stmt, err = db.Prepare("INSERT INTO notifications(id, post_id,user_id, source_user_id, notification_type) VALUES(?, ?, ?, ?)")
+			stmt, err = db.Prepare("INSERT INTO notifications(id, post_id,user_id, source_user_id, notification_type) VALUES(?, ?, ?, ?, ?)")
 			if err != nil {
 				tx.Rollback()
 				log.Printf("insert into sql, %v\n", err)
@@ -520,7 +520,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("fail: db begin, %v\n", err)
 			return
 		}
-		stmt, err := db.Prepare("INSERT INTO notifications(id, post_id,user_id, source_user_id, notification_type,content) VALUES(?, ?, ?, ?, ?)")
+		stmt, err := db.Prepare("INSERT INTO notifications(id, post_id,user_id, source_user_id, notification_type,content) VALUES(?, ?, ?, ?, ?, ?)")
 		if err != nil {
 			tx.Rollback()
 			log.Printf("insert into sql, %v\n", err)
@@ -576,7 +576,7 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("fail: db begin, %v\n", err)
 			return
 		}
-		stmt, err := db.Prepare("INSERT INTO notifications(id, post_id,user_id, source_user_id, notification_type,content) VALUES(?, ?, ?, ?, ?)")
+		stmt, err := db.Prepare("INSERT INTO notifications(id, post_id,user_id, source_user_id, notification_type,content) VALUES(?, ?, ?, ?, ?, ?)")
 		if err != nil {
 			tx.Rollback()
 			log.Printf("insert into sql, %v\n", err)
