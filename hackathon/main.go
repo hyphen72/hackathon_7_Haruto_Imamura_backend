@@ -436,6 +436,36 @@ func posthandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		if reply != "" {
+			notification_id := generateUUID()
+			tx, err := db.Begin()
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				log.Printf("fail: db begin, %v\n", err)
+				return
+			}
+			stmt, err = db.Prepare("INSERT INTO notifications(id, post_id, source_user_id, notification_type) VALUES(?, ?, ?, ?)")
+			if err != nil {
+				tx.Rollback()
+				log.Printf("insert into sql, %v\n", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			defer stmt.Close()
+			_, err = stmt.Exec(notification_id,reply,id,"reply")
+			if err != nil {
+				tx.Rollback()
+				log.Printf("fail:stmt, %v\n", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			if err = tx.Commit(); err != nil {
+				tx.Rollback()
+				log.Printf("fail: commit, %v\n", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		}
 		modresult, err := moderatePostContent(ctx,content)
 		if(modresult.Status == "flagged"){
 			maxSeverity := 0 
@@ -696,6 +726,34 @@ func likehandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
             return
         }
+		notification_id := generateUUID()
+		tx, err := db.Begin()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			log.Printf("fail: db begin, %v\n", err)
+			return
+		}
+		stmt, err = db.Prepare("INSERT INTO notifications(id, post_id, source_user_id, notification_type) VALUES(?, ?, ?, ?)")
+		if err != nil {
+			tx.Rollback()
+			log.Printf("insert into sql, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		defer stmt.Close()
+		_, err = stmt.Exec(notification_id,postID,likingUserID,"like")
+		if err != nil {
+			tx.Rollback()
+			log.Printf("fail:stmt, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if err = tx.Commit(); err != nil {
+			tx.Rollback()
+			log.Printf("fail: commit, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
         w.WriteHeader(http.StatusCreated) 
         log.Printf("User %s liked post %s", likingUserID, postID)
 
