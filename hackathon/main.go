@@ -1007,6 +1007,22 @@ func notificationhandler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("エラー: JSONエンコードに失敗しました, %v\n", err)
 			return
 		}
+	case http.MethodPut:
+		vars := mux.Vars(r)
+		notificationID := vars["notificationId"]
+		query := `UPDATE notifications SET is_read= TRUE WHERE id = ?`
+		result, err := db.Exec(query, notificationID)
+    	if err != nil {
+        	http.Error(w, fmt.Sprintf("Failed to update notification: %v", err), http.StatusInternalServerError)
+        	return
+    	}
+		rowsAffected, err := result.RowsAffected()
+    	if err != nil {
+        	fmt.Printf("Warning: Could not get rows affected: %v\n", err)
+    	} else if rowsAffected == 0 {
+        	fmt.Printf("Notification ID %s not found or already read.\n", notificationID)
+		}
+		w.WriteHeader(http.StatusOK)
     default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
@@ -1062,7 +1078,7 @@ func main() {
     router.HandleFunc("/post", posthandler).Methods("GET", "POST", "OPTIONS")
     router.HandleFunc("/likes", likehandler).Methods("POST", "DELETE", "OPTIONS")
 	router.HandleFunc("/notification/unread", countnotificationhandler).Methods("GET", "OPTIONS")
-	router.HandleFunc("/notifications", notificationhandler).Methods("GET", "OPTIONS")
+	router.HandleFunc("/notifications/{notificationID}", notificationhandler).Methods("GET", "OPTIONS")
 	// ③ Ctrl+CでHTTPサーバー停止時にDBをクローズする
 	closeDBWithSysCall()
 
