@@ -1087,10 +1087,11 @@ func notificationhandler(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN
 			users u ON n.source_user_id = u.id 
 		WHERE
-			n.user_id = ? AND n.is_read = FALSE
+			n.user_id = ? AND n.is_read = 0
 		ORDER BY 
             n.created_at DESC`
 		row := db.QueryRow(query, id)
+		console.log(row)
 		var p ReqNotification
 		row.Scan(&p.ID, &p.UserID, &p.PostID, &p.PostContent, &p.SourceUserID, &p.SourceUsername, &p.IsRead, &p.CreatedAt, &p.NotificationType);
 		w.Header().Set("Content-Type", "application/json")
